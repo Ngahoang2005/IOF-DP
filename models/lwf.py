@@ -91,6 +91,8 @@ class IPTScore:
 
     def update_ipt_outer(self, model, global_step): 
         for n,p in model.named_parameters():
+            if "fc" in n:   # bỏ qua tất cả tham số có 'fc' trong tên
+                continue
             if p.requires_grad:
                 if torch.isnan(p.grad).any():
                     print(f"{n},外层循环梯度中存在 NaN 值")
@@ -110,16 +112,15 @@ class IPTScore:
                         self.ipt_outer[n] = (p * p.grad * p * p.grad).abs().detach()
                     elif self.taylor in ['param_mix']:
                         self.ipt_outer[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
-                    # self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + \
-                    #                     (1-self.beta1)*self.ipt_outer[n]
-                    
-                    # # Update uncertainty 
-                    # self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
-                    print(f"[Shape mismatch] {n}: exp_avg_ipt_outer = {self.exp_avg_ipt_outer[n].shape}, "f"ipt_outer = {self.ipt_outer[n].shape}")
+                    self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + (1-self.beta1)*self.ipt_outer[n]
+                    # Update uncertainty 
+                    self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
+
 
     def update_ipt_inner(self, model, global_step): 
         for n,p in model.named_parameters():
-
+            if "fc" in n:   # bỏ qua tất cả tham số có 'fc' trong tên
+                continue
             if p.requires_grad:
                 if torch.isnan(p.grad).any():
                     print(f"{n},梯度中存在 NaN 值")
@@ -140,12 +141,9 @@ class IPTScore:
                         self.ipt_inner[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
 
                     # Update sensitivity 
-                    # self.exp_avg_ipt_inner[n] = self.beta1 * self.exp_avg_ipt_inner[n] + \
-                    #                     (1-self.beta1)*self.ipt_inner[n]
-                    # # Update uncertainty 
-                    # self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + \
-                    #                     (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
-                    print(f"[Shape mismatch] {n}: exp_avg_ipt_inner = {self.exp_avg_ipt_inner[n].shape}, "f"ipt_inner = {self.ipt_inner[n].shape}")
+                    self.exp_avg_ipt_inner[n] = self.beta1 * self.exp_avg_ipt_inner[n] + (1-self.beta1)*self.ipt_inner[n]
+                    # Update uncertainty 
+                    self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
     def normalize_importance_scores(self, ipt_score_dic):
     
         all_scores_tensor = torch.cat([score.flatten() for score in ipt_score_dic.values()])
