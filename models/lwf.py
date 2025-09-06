@@ -101,9 +101,10 @@ class IPTScore:
                     self.ipt_outer[n] = torch.zeros_like(p)
                     self.exp_avg_ipt_outer[n] = torch.zeros_like(p) 
                     self.exp_avg_unc_outer[n] = torch.zeros_like(p) 
-                    #print(f"name n is: {n}, dimension is {p.shape}")
+                    print("đã thêm")
                 with torch.no_grad():
                     # Calculate sensitivity 
+                    
                     self.ipt_outer[n] = (p * p.grad).abs().detach()
                     if self.taylor in ['param_second']:
                         self.ipt_outer[n] = (p * p.grad * p * p.grad).abs().detach()
@@ -111,10 +112,10 @@ class IPTScore:
                         self.ipt_outer[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
                     # self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + \
                     #                     (1-self.beta1)*self.ipt_outer[n]
-                    self.exp_avg_ipt_outer[n] = self.exp_avg_ipt_outer[n] + self.ipt_outer[n]
-                    # Update uncertainty 
-                    self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
-
+                    
+                    # # Update uncertainty 
+                    # self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
+                    print(f"[Shape mismatch] {n}: exp_avg_ipt_outer = {self.exp_avg_ipt_outer[n].shape}, "f"ipt_outer = {self.ipt_outer[n].shape}")
 
     def update_ipt_inner(self, model, global_step): 
         for n,p in model.named_parameters():
@@ -139,11 +140,12 @@ class IPTScore:
                         self.ipt_inner[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
 
                     # Update sensitivity 
-                    self.exp_avg_ipt_inner[n] = self.exp_avg_ipt_inner[n] + self.ipt_inner[n]
-                    # Update uncertainty 
-                    self.exp_avg_unc_inner[n] = self.exp_avg_unc_inner[n] + (self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
-                
-
+                    # self.exp_avg_ipt_inner[n] = self.beta1 * self.exp_avg_ipt_inner[n] + \
+                    #                     (1-self.beta1)*self.ipt_inner[n]
+                    # # Update uncertainty 
+                    # self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + \
+                    #                     (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
+                    print(f"[Shape mismatch] {n}: exp_avg_ipt_inner = {self.exp_avg_ipt_inner[n].shape}, "f"ipt_inner = {self.ipt_inner[n].shape}")
     def normalize_importance_scores(self, ipt_score_dic):
     
         all_scores_tensor = torch.cat([score.flatten() for score in ipt_score_dic.values()])
@@ -152,8 +154,8 @@ class IPTScore:
         # 计算最小值和最大值
         min_score = torch.min(all_scores_tensor)
         max_score = torch.max(all_scores_tensor)
-        #print(f"min_score: {min_score}")
-        #print(f"max_score: {max_score}")
+        print(f"min_score: {min_score}")
+        print(f"max_score: {max_score}")
         # 对所有值进行归一化
         normalized_dic = {}
         for n, score in ipt_score_dic.items():
@@ -163,8 +165,8 @@ class IPTScore:
         all_scores_tensor = torch.cat([score.flatten() for score in normalized_dic.values()])
         min_score = torch.min(all_scores_tensor)
         max_score = torch.max(all_scores_tensor)
-        #print(f"归一化后min_score: {min_score}")
-        #print(f"归一化后max_score: {max_score}")
+        print(f"归一化后min_score: {min_score}")
+        print(f"归一化后max_score: {max_score}")
         #sys.exit(1)
         return normalized_dic
 
