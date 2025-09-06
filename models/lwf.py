@@ -64,6 +64,289 @@ lamda = 10
 # refer to supplementary materials for other dataset training settings
 
 EPSILON = 1e-8
+class IPTScore:
+    def __init__(
+        self, model, 
+      
+        beta1:float, 
+        beta2:float, 
+
+        tau:float,  # 01mask转换
+        taylor = None, # 表示用几阶梯度来做为重要性指标 param_second, param_first, param_mix
+        
+    ):
+
+        
+        self.beta1 = beta1
+        self.beta2 = beta2
+      
+      
+        self.model = model
+        self.ipt_outer = {} 
+        self.exp_avg_ipt_outer = {}
+        self.exp_avg_unc_outer = {}
+
+        self.ipt_inner = {} 
+        self.exp_avg_ipt_inner = {}
+        self.exp_avg_unc_inner = {}
+
+
+        self.taylor = taylor
+        self.tau = tau
+        print(f"self.taylor is: {self.taylor}")
+        print(f"self.tau is: {self.tau}")
+
+        assert (self.beta1<1 and self.beta1>0)
+        assert (self.beta2<1 and self.beta2>0)
+
+
+    def update_ipt_outer(self, model, global_step): 
+        for n,p in model.named_parameters():
+            if p.requires_grad:
+                if torch.isnan(p.grad).any():
+                    print(f"{n},外层循环梯度中存在 NaN 值")
+                    #print(p.grad)
+                    print(f"step is {global_step}")
+                    sys.exit(1) 
+                if n not in self.ipt_outer:
+                    self.ipt_outer[n] = torch.zeros_like(p)
+                    self.exp_avg_ipt_outer[n] = torch.zeros_like(p) 
+                    self.exp_avg_unc_outer[n] = torch.zeros_like(p) 
+                    #print(f"name n is: {n}, dimension is {p.shape}")
+                with torch.no_grad():
+                    # Calculate sensitivity 
+                    self.ipt_outer[n] = (p * p.grad).abs().detach()
+                    if self.taylor in ['param_second']:
+                        self.ipt_outer[n] = (p * p.grad * p * p.grad).abs().detach()
+                    elif self.taylor in ['param_mix']:
+                        self.ipt_outer[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
+
+                    # Update sensitivity 
+                    self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + \
+                                        (1-self.beta1)*self.ipt_outer[n]
+                    # Update uncertainty 
+                    self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + \
+                                        (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
+
+
+    def update_ipt_inner(self, model, global_step): 
+        for n,p in model.named_parameters():
+
+            if p.requires_grad:
+                if torch.isnan(p.grad).any():
+                    print(f"{n},梯度中存在 NaN 值")
+                    #print(p.grad)
+                    print(f"step is {global_step}")
+                    break 
+                if n not in self.ipt_inner:
+                    self.ipt_inner[n] = torch.zeros_like(p)
+                    self.exp_avg_ipt_inner[n] = torch.zeros_like(p) 
+                    self.exp_avg_unc_inner[n] = torch.zeros_like(p) 
+                    #print(f"name n is: {n}, dimension is {p.shape}")
+                with torch.no_grad():
+                    # Calculate sensitivity 
+                    self.ipt_inner[n] = (p * p.grad).abs().detach()
+                    if self.taylor in ['param_second']:
+                        self.ipt_inner[n] = (p * p.grad * p * p.grad).abs().detach()
+                    elif self.taylor in ['param_mix']:
+                        self.ipt_inner[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
+
+                    # Update sensitivity 
+                    self.exp_avg_ipt_inner[n] = self.beta1 * self.exp_avg_ipt_inner[n] + \
+                                        (1-self.beta1)*self.ipt_inner[n]
+                    # Update uncertainty 
+                    self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + \
+                                        (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
+                
+
+    def normalize_importance_scores(self, ipt_score_dic):
+    
+        all_scores_tensor = torch.cat([score.flatten() for score in ipt_score_dic.values()])
+
+
+        # 计算最小值和最大值
+        min_score = torch.min(all_scores_tensor)
+        max_score = torch.max(all_scores_tensor)
+        #print(f"min_score: {min_score}")
+        #print(f"max_score: {max_score}")
+        # 对所有值进行归一化
+        normalized_dic = {}
+        for n, score in ipt_score_dic.items():
+            normalized_dic[n] = (score - min_score) / (max_score - min_score)
+
+
+        all_scores_tensor = torch.cat([score.flatten() for score in normalized_dic.values()])
+        min_score = torch.min(all_scores_tensor)
+        max_score = torch.max(all_scores_tensor)
+        #print(f"归一化后min_score: {min_score}")
+        #print(f"归一化后max_score: {max_score}")
+        #sys.exit(1)
+        return normalized_dic
+
+
+    # 这个应该是最后训练完返回结果
+    def calculate_score_inner(self, p=None, metric="ipt"):
+        assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
+    
+        ipt_score_dic_inner = {}
+        for n in self.exp_avg_ipt_inner:
+            #print(f"name is {n}")
+            #ipt_name_list.append(n)
+            if metric == "ipt":
+                # Combine the senstivity and uncertainty 
+                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+            elif metric == "mag":
+                ipt_score = p.abs().detach().clone() 
+            else:
+                raise ValueError("Unexcptected Metric: %s"%metric)
+            
+            # print(f"score is {ipt_score}")
+            #ipt_score_mean = torch.mean(ipt_score).item()
+            #print(f"mean score is {ipt_score_mean}")
+            
+            ipt_score_dic_inner[n] = ipt_score
+        # print(f"ipt is {self.ipt}")
+        # print(f"exp_avg_ipt is {self.exp_avg_ipt[n]}")
+        # print(f"exp_avg_unc is {self.exp_avg_unc[n]}")
+        assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
+        
+        
+        ipt_score_dic_outer = {}
+        for n in self.exp_avg_ipt_outer:
+            #print(f"name is {n}")
+            #ipt_name_list.append(n)
+            if metric == "ipt":
+                # Combine the senstivity and uncertainty 
+                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+            elif metric == "mag":
+                ipt_score = p.abs().detach().clone() 
+            else:
+                raise ValueError("Unexcptected Metric: %s"%metric)
+            
+            # print(f"score is {ipt_score}")
+            #ipt_score_mean = torch.mean(ipt_score).item()
+            #print(f"mean score is {ipt_score_mean}")
+            
+            ipt_score_dic_outer[n] = ipt_score
+
+        # 补充：需要做一个归一化操作，否则会导致权重都是0.5
+        # 原因是重要性的值都非常小，可能有e-15次方左右，做完指数操作后，结果都是1
+        
+        # 新增全局01归一化操作
+        ipt_score_dic_inner_norm = self.normalize_importance_scores(ipt_score_dic_inner)
+        ipt_score_dic_outer_norm = self.normalize_importance_scores(ipt_score_dic_outer)
+
+        inner_mask = {}
+
+        for key in ipt_score_dic_inner_norm:
+            assert key in ipt_score_dic_outer_norm
+            ipt_score_inner = ipt_score_dic_inner_norm[key].cpu().numpy()
+            ipt_score_outer = ipt_score_dic_outer_norm[key].cpu().numpy()
+
+            exp_term_inner = np.exp(ipt_score_inner / self.tau)
+            exp_term_outer = np.exp(ipt_score_outer / self.tau)
+            denominator = exp_term_inner + exp_term_outer
+            
+            coefficient_inner = exp_term_inner / denominator
+
+            inner_mask[key] = coefficient_inner
+            inner_mask[key] = torch.tensor(coefficient_inner, device=ipt_score_dic_inner[key].device)
+ 
+ 
+        return inner_mask
+
+    def calculate_score_outer(self, p=None, metric="ipt"):
+        assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
+
+        ipt_score_dic_inner = {}
+        for n in self.exp_avg_ipt_inner:
+            #print(f"name is {n}")
+            #ipt_name_list.append(n)
+            if metric == "ipt":
+                # Combine the senstivity and uncertainty 
+                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+            elif metric == "mag":
+                ipt_score = p.abs().detach().clone() 
+            else:
+                raise ValueError("Unexcptected Metric: %s"%metric)
+            
+            # print(f"score is {ipt_score}")
+            #ipt_score_mean = torch.mean(ipt_score).item()
+            #print(f"mean score is {ipt_score_mean}")
+            
+            ipt_score_dic_inner[n] = ipt_score
+        # print(f"ipt is {self.ipt}")
+        # print(f"exp_avg_ipt is {self.exp_avg_ipt[n]}")
+        # print(f"exp_avg_unc is {self.exp_avg_unc[n]}")
+        assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
+        
+        
+        ipt_score_dic_outer = {}
+        for n in self.exp_avg_ipt_outer:
+            #print(f"name is {n}")
+            #ipt_name_list.append(n)
+            if metric == "ipt":
+                # Combine the senstivity and uncertainty 
+                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+            elif metric == "mag":
+                ipt_score = p.abs().detach().clone() 
+            else:
+                raise ValueError("Unexcptected Metric: %s"%metric)
+          
+            
+            ipt_score_dic_outer[n] = ipt_score
+
+     
+        ipt_score_dic_inner_norm = self.normalize_importance_scores(ipt_score_dic_inner)
+        ipt_score_dic_outer_norm = self.normalize_importance_scores(ipt_score_dic_outer)
+
+        outer_mask = {}
+
+        for key in ipt_score_dic_inner_norm:
+            assert key in ipt_score_dic_outer_norm
+            ipt_score_inner = ipt_score_dic_inner_norm[key].cpu().numpy()
+            ipt_score_outer = ipt_score_dic_outer_norm[key].cpu().numpy()
+            #print(f"ipt_score_inner: {ipt_score_inner}")
+            #print(f"ipt_score_outer: {ipt_score_outer}")
+            exp_term_inner = np.exp(ipt_score_inner / self.tau)
+            exp_term_outer = np.exp(ipt_score_outer / self.tau)
+            #print(f"exp_term_inner: {exp_term_inner}")
+            #print(f"exp_term_outer: {exp_term_outer}")
+            #sys.exit(1)
+            denominator = exp_term_inner + exp_term_outer
+            
+            coefficient_outer = exp_term_outer / denominator
+
+            outer_mask[key] = torch.tensor(coefficient_outer, device=ipt_score_dic_outer[key].device)
+ 
+
+        return outer_mask
+    
+    def update_inner_score(self, model, global_step):
+        # if global_step < self.total_step and global_step > self.initial_warmup:
+        #     # Update importance scores element-wise 
+        #     self.update_ipt(model, global_step)
+
+        self.update_ipt_inner(model, global_step)
+    
+    def update_outer_score(self, model, global_step):
+        # if global_step < self.total_step and global_step > self.initial_warmup:
+        #     # Update importance scores element-wise 
+        #     self.update_ipt(model, global_step)
+
+        self.update_ipt_outer(model, global_step)
+
+
+    def empty_inner_score(self):
+        self.ipt_inner = {} 
+        self.exp_avg_ipt_inner = {}
+        self.exp_avg_unc_inner = {}
+
+    def empty_outer_score(self):
+        self.ipt_outer = {} 
+        self.exp_avg_ipt_outer = {}
+        self.exp_avg_unc_outer = {}
+
 
 class LwF(BaseLearner):
     def __init__(self, args):
@@ -106,7 +389,9 @@ class LwF(BaseLearner):
         if self.args["DPCR"]:
             self._covs = []
             self._projectors = []
-
+        self._old_network = None 
+        self.ipt_score = IPTScore(self._network, beta1=0.9, beta2=0.999, tau=0.1)
+        self.T = args.get("T", 2.0)
     def after_task(self):
         self._old_network = self._network.copy().freeze()
         self._known_classes = self._total_classes
@@ -115,7 +400,6 @@ class LwF(BaseLearner):
                 os.makedirs(self.args["model_dir"])
             self.save_checkpoint("{}".format(self.args["model_dir"]))
         
-
     def incremental_train(self, data_manager):
         self.data_manager = data_manager
         self._cur_task += 1
@@ -293,10 +577,6 @@ class LwF(BaseLearner):
                 self.al_classifier.fc.weight = torch.nn.parameter.Parameter(
                         F.normalize(torch.t(Delta.float()), p=2, dim=-1))
 
-
-
-
-
     # SVD for calculating the W_c
     def get_projector_svd(self, raw_matrix, all_non_zeros=True):
         V, S, VT = torch.svd(raw_matrix)
@@ -369,64 +649,133 @@ class LwF(BaseLearner):
 
         logging.info(info)
 
-    def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
+
+       
+    def update_parameters_with_task_vectors(self, theta_t, delta_in, delta_out):
+        inner_mask = self.ipt_score.calculate_score_inner(metric="ipt")
+        outer_mask = self.ipt_score.calculate_score_outer(metric="ipt")
+        
+        for n in inner_mask:
+            inner = inner_mask[n]
+            outer = outer_mask[n]
+            assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
+            both_one = (inner == 1) & (outer == 1)
+            inner[both_one] = 0.4
+            outer[both_one] = 0.6
+            both_zero = (inner == 0) & (outer == 0)
+            inner[both_zero] = 0.5
+            outer[both_zero] = 0.5
+     
+        keys_inner_mask = set(inner_mask.keys())
+        keys_delta_in = set(delta_in.keys())
+        keys_delta_out = set(delta_out.keys())
+        keys_outer_mask = set(outer_mask.keys())
+        keys_theta_t = set(theta_t.keys())
+        assert keys_inner_mask == keys_delta_in == keys_delta_out == keys_outer_mask == keys_theta_t, (
+            f"Key mismatch: inner_mask keys: {keys_inner_mask}, "
+            f"delta_in keys: {keys_delta_in}, "
+            f"delta_out keys: {keys_delta_out}, "
+            f"outer_mask keys: {keys_outer_mask}, "
+            f"theta_t keys: {keys_theta_t}"
+        )
+        final_delta = {n: inner_mask[n] * delta_in[n] + outer_mask[n] * delta_out[n] for n in theta_t}
+        with torch.no_grad():
+            for n, p in self._network.named_parameters():
+                if n in final_delta:
+                    p.copy_(theta_t[n] + final_delta[n])
+    
+
+    def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
+        self.ipt_score.empty_inner_score()
+        self.ipt_score.empty_outer_score()
 
         prog_bar = tqdm(range(epochs))
-        for _, epoch in enumerate(prog_bar):
+        for epoch in prog_bar:
             self._network.train()
             losses = 0.0
             correct, total = 0, 0
-            for i, (_, inputs, targets) in enumerate(train_loader):
-                inputs, targets = inputs.to(self._device), targets.to(self._device)
-                logits = self._network(inputs)["logits"]
 
-                fake_targets = targets - self._known_classes
-                loss_clf = F.cross_entropy(
-                    logits[:, self._known_classes :], fake_targets
-                )
-                loss_kd = _KD_loss(
-                    logits[:, : self._known_classes],
-                    self._old_network(inputs)["logits"],
-                    T,
-                )
+            data_iter = iter(train_loader)
 
-                loss = lamda * loss_kd + loss_clf
+            for cycle in range(32):  # 32 chu kỳ
+                # === 4 bước INNER ===
+                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+                for _ in range(3):
+                    try:
+                        _, inputs, targets = next(data_iter)
+                    except StopIteration:
+                        data_iter = iter(train_loader)
+                        _, inputs, targets = next(data_iter)
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                losses += loss.item()
+                    inputs, targets = inputs.to(self._device), targets.to(self._device)
+                    student_outputs = self._network(inputs)["logits"]
+                    fake_targets = targets - self._known_classes
+                    loss_inner = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
 
-                with torch.no_grad():
-                    _, preds = torch.max(logits, dim=1)
-                    correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-                    total += len(targets)
+                    optimizer.zero_grad()
+                    loss_inner.backward()
+                    self.ipt_score.update_inner_score(self._network, epoch)
+                    optimizer.step()
+    
+                    losses += loss_inner.item()
+                    _, preds = torch.max(student_outputs, dim=1)
+                    correct += preds.eq(targets).cpu().sum().item()
+                    total += targets.size(0)
+                theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+                delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
 
+                # === 1 bước OUTER ===
+                for _ in range(3): 
+                    try:
+                        _, inputs, targets = next(data_iter)
+                    except StopIteration:
+                        data_iter = iter(train_loader)
+                        _, inputs, targets = next(data_iter)
+
+                    inputs, targets = inputs.to(self._device), targets.to(self._device)
+
+                    if self._old_network is None:
+                        raise RuntimeError("No teacher network for KD")
+                    with torch.no_grad():
+                        teacher_outputs = self._old_network(inputs)["logits"]
+
+                    student_outputs = self._network(inputs)["logits"]
+                    kd = _KD_loss(student_outputs[:, :self._known_classes], teacher_outputs, self.T)
+                    fake_targets = targets - self._known_classes
+                    ce_loss = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
+                    kd_loss = kd 
+
+                    optimizer.zero_grad()
+                    kd_loss.backward()
+                    self.ipt_score.update_outer_score(self._network, epoch)
+                    
+                    optimizer.step()
+
+                    losses += kd_loss.item()
+                theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+                delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
+                self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out) 
+                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+            # ---- epoch end ----
             scheduler.step()
-            train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-            if epoch % 25 == 0:
-                test_acc = self._compute_accuracy(self._network, test_loader)
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    epochs,
-                    losses / len(train_loader),
-                    train_acc,
-                    test_acc,
-                )
-            else:
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    epochs,
-                    losses / len(train_loader),
-                    train_acc,
-                )
+            train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
+            test_acc = self._compute_accuracy(self._network, test_loader)
+            info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+                self._cur_task,
+                epoch + 1,
+                epochs,
+                losses / len(train_loader),
+                train_acc,
+                test_acc,
+            )
             prog_bar.set_description(info)
         logging.info(info)
 
-def _KD_loss(pred, soft, T):
-    pred = torch.log_softmax(pred / T, dim=1)
-    soft = torch.softmax(soft / T, dim=1)
-    return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
+    
 
+def _KD_loss(student_logits, teacher_logits, T=2.0):
+    return F.kl_div(
+        F.log_softmax(student_logits / T, dim=-1),
+        F.softmax(teacher_logits / T, dim=-1),
+        reduction="batchmean"
+    ) * (T * T)
