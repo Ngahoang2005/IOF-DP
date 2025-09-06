@@ -319,7 +319,7 @@ class LwF(BaseLearner):
             self._covs = []
             self._projectors = []
         self._old_network = None 
-        self.ipt_score = IPTScore(self._network, beta1=0.9, beta2=0.999, tau=0.1)
+        self.ipt_score = IPTScore(self._network, beta1=0.55, beta2=0.55, tau=0.1)
         self.T = args.get("T", 2.0)
     def after_task(self):
         self._old_network = self._network.copy().freeze()
