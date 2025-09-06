@@ -174,8 +174,8 @@ class IPTScore:
             #ipt_name_list.append(n)
             if metric == "ipt":
                 # Combine the senstivity and uncertainty 
-                #ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
-                ipt_score = self.exp_avg_ipt_inner[n]
+                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                #ipt_score = self.exp_avg_ipt_inner[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -187,8 +187,8 @@ class IPTScore:
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
             if metric == "ipt":
-                #ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
-                ipt_score = self.exp_avg_ipt_outer[n]
+                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                #ipt_score = self.exp_avg_ipt_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -219,8 +219,8 @@ class IPTScore:
         for n in self.exp_avg_ipt_inner:
             if metric == "ipt":
                 # Combine the senstivity and uncertainty 
-                #ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
-                ipt_score = self.exp_avg_ipt_inner[n]
+                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                #ipt_score = self.exp_avg_ipt_inner[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -236,8 +236,8 @@ class IPTScore:
         
             if metric == "ipt":
             
-                #ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
-                ipt_score = self.exp_avg_ipt_outer[n]
+                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                #ipt_score = self.exp_avg_ipt_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -276,18 +276,6 @@ class IPTScore:
     def update_outer_score(self, model, global_step):
       
         self.update_ipt_outer(model, global_step)
-
-
-    def empty_inner_score(self):
-        self.ipt_inner = {} 
-        self.exp_avg_ipt_inner = {}
-        self.exp_avg_unc_inner = {}
-
-    def empty_outer_score(self):
-        self.ipt_outer = {} 
-        self.exp_avg_ipt_outer = {}
-        self.exp_avg_unc_outer = {}
-
 
 class LwF(BaseLearner):
     def __init__(self, args):
