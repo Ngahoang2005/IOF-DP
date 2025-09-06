@@ -615,12 +615,11 @@ class LwF(BaseLearner):
             both_one = (inner == 1) & (outer == 1)
             inner[both_one] = 0.3
             outer[both_one] = 0.7
-            print(f"Parameter {n} has {both_one.sum().item()} elements where both inner and outer masks are 1.")
+            
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.4
             outer[both_zero] = 0.6
-            print(f"Parameter {n} has {both_zero.sum().item()} elements where both inner and outer masks are 0.")
-     
+        
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
