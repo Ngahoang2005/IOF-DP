@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 20
+init_epoch = 2
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 20 
+epochs = 2
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -71,27 +71,20 @@ class IPTScore:
         beta2:float, 
         tau:float,  # 01mask转换
         taylor = None, # 表示用几阶梯度来做为重要性指标 param_second, param_first, param_mix
-        
     ):
         self.beta1 = beta1
         self.beta2 = beta2
-      
-      
         self.model = model
         self.ipt_outer = {} 
         self.exp_avg_ipt_outer = {}
         self.exp_avg_unc_outer = {}
-
         self.ipt_inner = {} 
         self.exp_avg_ipt_inner = {}
         self.exp_avg_unc_inner = {}
-
-
         self.taylor = taylor
         self.tau = tau
         print(f"self.taylor is: {self.taylor}")
         print(f"self.tau is: {self.tau}")
-
         assert (self.beta1<1 and self.beta1>0)
         assert (self.beta2<1 and self.beta2>0)
 
@@ -116,8 +109,6 @@ class IPTScore:
                         self.ipt_outer[n] = (p * p.grad * p * p.grad).abs().detach()
                     elif self.taylor in ['param_mix']:
                         self.ipt_outer[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
-
-                    # Update sensitivity 
                     self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + \
                                         (1-self.beta1)*self.ipt_outer[n]
                     # Update uncertainty 
@@ -190,7 +181,8 @@ class IPTScore:
             #ipt_name_list.append(n)
             if metric == "ipt":
                 # Combine the senstivity and uncertainty 
-                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                #ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                ipt_score = self.exp_avg_ipt_inner[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -202,7 +194,8 @@ class IPTScore:
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
             if metric == "ipt":
-                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                #ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                ipt_score = self.exp_avg_ipt_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -233,7 +226,8 @@ class IPTScore:
         for n in self.exp_avg_ipt_inner:
             if metric == "ipt":
                 # Combine the senstivity and uncertainty 
-                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                #ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                ipt_score = self.exp_avg_ipt_inner[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -249,7 +243,8 @@ class IPTScore:
         
             if metric == "ipt":
             
-                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                #ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                ipt_score = self.exp_avg_ipt_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -603,7 +598,6 @@ class LwF(BaseLearner):
         logging.info(info)
 
 
-       
     def update_parameters_with_task_vectors(self, theta_t, delta_in, delta_out):
         inner_mask = self.ipt_score.calculate_score_inner(metric="ipt")
         outer_mask = self.ipt_score.calculate_score_outer(metric="ipt")
@@ -613,12 +607,12 @@ class LwF(BaseLearner):
             outer = outer_mask[n]
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] = 0.3
-            outer[both_one] = 0.7
+            inner[both_one] = 0.4
+            outer[both_one] = 0.6
             
             both_zero = (inner == 0) & (outer == 0)
-            inner[both_zero] = 0.4
-            outer[both_zero] = 0.6
+            inner[both_zero] = 0.5
+            outer[both_zero] = 0.5
         
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
@@ -640,8 +634,8 @@ class LwF(BaseLearner):
     
 
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
-        self.ipt_score.empty_inner_score()
-        self.ipt_score.empty_outer_score()
+        #self.ipt_score.empty_inner_score()
+        #self.ipt_score.empty_outer_score()
 
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
@@ -724,8 +718,6 @@ class LwF(BaseLearner):
             )
             prog_bar.set_description(info)
         logging.info(info)
-
-    
 
 def _KD_loss(student_logits, teacher_logits, T=2.0):
     return F.kl_div(
