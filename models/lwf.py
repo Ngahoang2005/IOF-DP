@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 2
+init_epoch = 20
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 2
+epochs = 20
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -103,7 +103,6 @@ class IPTScore:
                     self.ipt_outer[n] = torch.zeros_like(p)
                     self.exp_avg_ipt_outer[n] = torch.zeros_like(p) 
                     self.exp_avg_unc_outer[n] = torch.zeros_like(p) 
-                    print("đã thêm")
                 with torch.no_grad():
                     # Calculate sensitivity 
                     
@@ -152,8 +151,6 @@ class IPTScore:
         # 计算最小值和最大值
         min_score = torch.min(all_scores_tensor)
         max_score = torch.max(all_scores_tensor)
-        print(f"min_score: {min_score}")
-        print(f"max_score: {max_score}")
         # 对所有值进行归一化
         normalized_dic = {}
         for n, score in ipt_score_dic.items():
@@ -163,8 +160,6 @@ class IPTScore:
         all_scores_tensor = torch.cat([score.flatten() for score in normalized_dic.values()])
         min_score = torch.min(all_scores_tensor)
         max_score = torch.max(all_scores_tensor)
-        print(f"归一化后min_score: {min_score}")
-        print(f"归一化后max_score: {max_score}")
         #sys.exit(1)
         return normalized_dic
 
