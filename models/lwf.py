@@ -139,11 +139,9 @@ class IPTScore:
                         self.ipt_inner[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
 
                     # Update sensitivity 
-                    self.exp_avg_ipt_inner[n] = self.beta1 * self.exp_avg_ipt_inner[n] + \
-                                        (1-self.beta1)*self.ipt_inner[n]
+                    self.exp_avg_ipt_inner[n] = self.exp_avg_ipt_inner[n] + self.ipt_inner[n]
                     # Update uncertainty 
-                    self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + \
-                                        (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
+                    self.exp_avg_unc_inner[n] = self.exp_avg_unc_inner[n] + (self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
                 
 
     def normalize_importance_scores(self, ipt_score_dic):
