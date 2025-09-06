@@ -645,7 +645,7 @@ class LwF(BaseLearner):
 
             for cycle in range(16):  # 32 chu kỳ
                 # === 4 bước INNER ===
-                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 for _ in range(3):
                     try:
                         _, inputs, targets = next(data_iter)
@@ -667,7 +667,7 @@ class LwF(BaseLearner):
                     _, preds = torch.max(student_outputs, dim=1)
                     correct += preds.eq(targets).cpu().sum().item()
                     total += targets.size(0)
-                theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+                theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
 
                 # === 1 bước OUTER ===
@@ -698,10 +698,10 @@ class LwF(BaseLearner):
                     optimizer.step()
 
                     losses += kd_loss.item()
-                theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+                theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                 self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out) 
-                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters()}
+                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
             # ---- epoch end ----
             scheduler.step()
             train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
