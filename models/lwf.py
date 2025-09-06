@@ -109,11 +109,11 @@ class IPTScore:
                         self.ipt_outer[n] = (p * p.grad * p * p.grad).abs().detach()
                     elif self.taylor in ['param_mix']:
                         self.ipt_outer[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
-                    self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + \
-                                        (1-self.beta1)*self.ipt_outer[n]
+                    # self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + \
+                    #                     (1-self.beta1)*self.ipt_outer[n]
+                    self.exp_avg_ipt_outer[n] = self.exp_avg_ipt_outer[n] + self.ipt_outer[n]
                     # Update uncertainty 
-                    self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + \
-                                        (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
+                    self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
 
 
     def update_ipt_inner(self, model, global_step): 
