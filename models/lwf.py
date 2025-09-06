@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 20
+init_epoch = 1
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 20
+epochs = 1
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -67,10 +67,8 @@ EPSILON = 1e-8
 class IPTScore:
     def __init__(
         self, model, 
-      
         beta1:float, 
         beta2:float, 
-
         tau:float,  # 01mask转换
         taylor = None, # 表示用几阶梯度来做为重要性指标 param_second, param_first, param_mix
         
@@ -197,40 +195,19 @@ class IPTScore:
                 ipt_score = p.abs().detach().clone() 
             else:
                 raise ValueError("Unexcptected Metric: %s"%metric)
-            
-            # print(f"score is {ipt_score}")
-            #ipt_score_mean = torch.mean(ipt_score).item()
-            #print(f"mean score is {ipt_score_mean}")
-            
             ipt_score_dic_inner[n] = ipt_score
-        # print(f"ipt is {self.ipt}")
-        # print(f"exp_avg_ipt is {self.exp_avg_ipt[n]}")
-        # print(f"exp_avg_unc is {self.exp_avg_unc[n]}")
         assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
         
         
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
-            #print(f"name is {n}")
-            #ipt_name_list.append(n)
             if metric == "ipt":
-                # Combine the senstivity and uncertainty 
                 ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
                 raise ValueError("Unexcptected Metric: %s"%metric)
-            
-            # print(f"score is {ipt_score}")
-            #ipt_score_mean = torch.mean(ipt_score).item()
-            #print(f"mean score is {ipt_score_mean}")
-            
             ipt_score_dic_outer[n] = ipt_score
-
-        # 补充：需要做一个归一化操作，否则会导致权重都是0.5
-        # 原因是重要性的值都非常小，可能有e-15次方左右，做完指数操作后，结果都是1
-        
-        # 新增全局01归一化操作
         ipt_score_dic_inner_norm = self.normalize_importance_scores(ipt_score_dic_inner)
         ipt_score_dic_outer_norm = self.normalize_importance_scores(ipt_score_dic_outer)
 
@@ -244,13 +221,9 @@ class IPTScore:
             exp_term_inner = np.exp(ipt_score_inner / self.tau)
             exp_term_outer = np.exp(ipt_score_outer / self.tau)
             denominator = exp_term_inner + exp_term_outer
-            
             coefficient_inner = exp_term_inner / denominator
-
             inner_mask[key] = coefficient_inner
             inner_mask[key] = torch.tensor(coefficient_inner, device=ipt_score_dic_inner[key].device)
- 
- 
         return inner_mask
 
     def calculate_score_outer(self, p=None, metric="ipt"):
@@ -258,8 +231,6 @@ class IPTScore:
 
         ipt_score_dic_inner = {}
         for n in self.exp_avg_ipt_inner:
-            #print(f"name is {n}")
-            #ipt_name_list.append(n)
             if metric == "ipt":
                 # Combine the senstivity and uncertainty 
                 ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
@@ -267,24 +238,17 @@ class IPTScore:
                 ipt_score = p.abs().detach().clone() 
             else:
                 raise ValueError("Unexcptected Metric: %s"%metric)
-            
-            # print(f"score is {ipt_score}")
-            #ipt_score_mean = torch.mean(ipt_score).item()
-            #print(f"mean score is {ipt_score_mean}")
-            
+        
             ipt_score_dic_inner[n] = ipt_score
-        # print(f"ipt is {self.ipt}")
-        # print(f"exp_avg_ipt is {self.exp_avg_ipt[n]}")
-        # print(f"exp_avg_unc is {self.exp_avg_unc[n]}")
+
         assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
         
         
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
-            #print(f"name is {n}")
-            #ipt_name_list.append(n)
+        
             if metric == "ipt":
-                # Combine the senstivity and uncertainty 
+            
                 ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
@@ -304,13 +268,10 @@ class IPTScore:
             assert key in ipt_score_dic_outer_norm
             ipt_score_inner = ipt_score_dic_inner_norm[key].cpu().numpy()
             ipt_score_outer = ipt_score_dic_outer_norm[key].cpu().numpy()
-            #print(f"ipt_score_inner: {ipt_score_inner}")
-            #print(f"ipt_score_outer: {ipt_score_outer}")
+         
             exp_term_inner = np.exp(ipt_score_inner / self.tau)
             exp_term_outer = np.exp(ipt_score_outer / self.tau)
-            #print(f"exp_term_inner: {exp_term_inner}")
-            #print(f"exp_term_outer: {exp_term_outer}")
-            #sys.exit(1)
+        
             denominator = exp_term_inner + exp_term_outer
             
             coefficient_outer = exp_term_outer / denominator
@@ -321,17 +282,11 @@ class IPTScore:
         return outer_mask
     
     def update_inner_score(self, model, global_step):
-        # if global_step < self.total_step and global_step > self.initial_warmup:
-        #     # Update importance scores element-wise 
-        #     self.update_ipt(model, global_step)
 
         self.update_ipt_inner(model, global_step)
     
     def update_outer_score(self, model, global_step):
-        # if global_step < self.total_step and global_step > self.initial_warmup:
-        #     # Update importance scores element-wise 
-        #     self.update_ipt(model, global_step)
-
+      
         self.update_ipt_outer(model, global_step)
 
 
@@ -660,9 +615,11 @@ class LwF(BaseLearner):
             both_one = (inner == 1) & (outer == 1)
             inner[both_one] = 0.3
             outer[both_one] = 0.7
+            print(f"Parameter {n} has {both_one.sum().item()} elements where both inner and outer masks are 1.")
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.4
             outer[both_zero] = 0.6
+            print(f"Parameter {n} has {both_zero.sum().item()} elements where both inner and outer masks are 0.")
      
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
