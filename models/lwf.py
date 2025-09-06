@@ -652,7 +652,7 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
 
-            for cycle in range(32):  # 32 chu kỳ
+            for cycle in range(16):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters()}
                 for _ in range(3):
