@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 200
+init_epoch = 20
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 20
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -105,7 +105,6 @@ class IPTScore:
                     self.exp_avg_unc_outer[n] = torch.zeros_like(p) 
                 with torch.no_grad():
                     # Calculate sensitivity 
-                    
                     self.ipt_outer[n] = (p * p.grad).abs().detach()
                     if self.taylor in ['param_second']:
                         self.ipt_outer[n] = (p * p.grad * p * p.grad).abs().detach()
@@ -114,8 +113,6 @@ class IPTScore:
                     self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + (1-self.beta1)*self.ipt_outer[n]
                     # Update uncertainty 
                     self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
-
-
     def update_ipt_inner(self, model, global_step): 
         for n,p in model.named_parameters():
             if "fc" in n:   # bỏ qua tất cả tham số có 'fc' trong tên
@@ -168,8 +165,8 @@ class IPTScore:
             #ipt_name_list.append(n)
             if metric == "ipt":
                 # Combine the senstivity and uncertainty 
-                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
-                #ipt_score = self.exp_avg_ipt_inner[n]
+                #ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                ipt_score = self.exp_avg_ipt_inner[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -181,8 +178,8 @@ class IPTScore:
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
             if metric == "ipt":
-                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
-                #ipt_score = self.exp_avg_ipt_outer[n]
+                #ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                ipt_score = self.exp_avg_ipt_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -213,8 +210,8 @@ class IPTScore:
         for n in self.exp_avg_ipt_inner:
             if metric == "ipt":
                 # Combine the senstivity and uncertainty 
-                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
-                #ipt_score = self.exp_avg_ipt_inner[n]
+                #ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+                ipt_score = self.exp_avg_ipt_inner[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
@@ -230,8 +227,8 @@ class IPTScore:
         
             if metric == "ipt":
             
-                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
-                #ipt_score = self.exp_avg_ipt_outer[n]
+                #ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+                ipt_score = self.exp_avg_ipt_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
