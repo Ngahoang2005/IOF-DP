@@ -645,7 +645,7 @@ class LwF(BaseLearner):
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
 
                 # === 1 bước OUTER ===
-                for _ in range(8): 
+                for _ in range(6): 
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
