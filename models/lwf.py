@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 20
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 20
+epochs = 100
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -130,7 +130,6 @@ class IPTScore:
                     self.ipt_inner[n] = torch.zeros_like(p)
                     self.exp_avg_ipt_inner[n] = torch.zeros_like(p) 
                     self.exp_avg_unc_inner[n] = torch.zeros_like(p) 
-                    #print(f"name n is: {n}, dimension is {p.shape}")
                 with torch.no_grad():
                     # Calculate sensitivity 
                     self.ipt_inner[n] = (p * p.grad).abs().detach()
@@ -146,12 +145,9 @@ class IPTScore:
     def normalize_importance_scores(self, ipt_score_dic):
     
         all_scores_tensor = torch.cat([score.flatten() for score in ipt_score_dic.values()])
-
-
-        # 计算最小值和最大值
+    
         min_score = torch.min(all_scores_tensor)
         max_score = torch.max(all_scores_tensor)
-        # 对所有值进行归一化
         normalized_dic = {}
         for n, score in ipt_score_dic.items():
             normalized_dic[n] = (score - min_score) / (max_score - min_score)
@@ -163,8 +159,6 @@ class IPTScore:
         #sys.exit(1)
         return normalized_dic
 
-
-    # 这个应该是最后训练完返回结果
     def calculate_score_inner(self, p=None, metric="ipt"):
         assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
     
