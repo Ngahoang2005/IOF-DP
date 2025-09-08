@@ -1178,11 +1178,11 @@ class LwF(BaseLearner):
             correct, total = 0, 0
 
             data_iter = iter(train_loader)
-            for cycle in range(8):  # 32 chu kỳ
+            for cycle in range(12):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 # === 1 bước OUTER ===
-                for _ in range(8):
+                for _ in range(6):
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
@@ -1200,7 +1200,7 @@ class LwF(BaseLearner):
                     kd = _KD_loss(student_outputs[:, :self._known_classes], teacher_outputs, self.T)
                     fake_targets = targets - self._known_classes
                     ce_loss = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
-                    kd_loss = 5*kd + ce_loss
+                    kd_loss = kd + ce_loss
 
                     optimizer.zero_grad()
                     kd_loss.backward()
