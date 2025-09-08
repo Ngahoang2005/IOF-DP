@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 200
+init_epoch = 20
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 20
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -616,10 +616,10 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
 
-            for cycle in range(8):  # 32 chu kỳ
+            for cycle in range(12):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                for _ in range(4):
+                for _ in range(1):
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
@@ -643,7 +643,7 @@ class LwF(BaseLearner):
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                 # === 1 bước OUTER ===
-                for _ in range(8): 
+                for _ in range(6): 
                     inputs, targets = inputs.to(self._device), targets.to(self._device)
                     logits = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
@@ -656,7 +656,7 @@ class LwF(BaseLearner):
                     T,
                     )
 
-                    loss = 10 * loss_kd + loss_clf
+                    loss = 5 * loss_kd + loss_clf
 
                     optimizer.zero_grad()
                     loss.backward()
