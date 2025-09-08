@@ -616,10 +616,10 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
 
-            for cycle in range(10):  # 32 chu kỳ
+            for cycle in range(5):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                for _ in range(4):
+                for _ in range(8):
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
@@ -644,7 +644,7 @@ class LwF(BaseLearner):
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                 # === 1 bước OUTER ===
-                for _ in range(6): 
+                for _ in range(12): 
                     inputs, targets = inputs.to(self._device), targets.to(self._device)
                     logits = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
