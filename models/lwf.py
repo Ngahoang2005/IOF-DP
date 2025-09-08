@@ -656,8 +656,7 @@ class LwF(BaseLearner):
                     T,
                     )
 
-                    loss = 5 * loss_kd + loss_clf
-
+                    loss = loss_kd
                     optimizer.zero_grad()
                     loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
