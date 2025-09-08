@@ -620,6 +620,12 @@ class LwF(BaseLearner):
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 for _ in range(4):
+                    try:
+                        inputs, targets = next(data_iter)
+                    except StopIteration:
+                        data_iter = iter(train_loader)
+                        inputs, targets = next(data_iter)
+
                     inputs, targets = inputs.to(self._device), targets.to(self._device)
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
