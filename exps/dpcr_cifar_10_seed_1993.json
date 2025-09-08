@@ -3,7 +3,7 @@
   "dataset": "cifar100",
   "memory_size": 0,
   "fixed_memory": false,
-  "shuffle": true,
+  "shuffle": false,
   "cosine": true,
   "init_cls": 10,
   "increment": 10,
