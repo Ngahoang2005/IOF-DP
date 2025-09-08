@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 200
+init_epoch = 2
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 2
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -619,7 +619,7 @@ class LwF(BaseLearner):
             for cycle in range(12):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                for _ in range(2):
+                for _ in range(3):
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
@@ -642,38 +642,32 @@ class LwF(BaseLearner):
                     total += targets.size(0)
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
-
                 # === 1 bước OUTER ===
                 for _ in range(6): 
-                    try:
-                        _, inputs, targets = next(data_iter)
-                    except StopIteration:
-                        data_iter = iter(train_loader)
-                        _, inputs, targets = next(data_iter)
-
                     inputs, targets = inputs.to(self._device), targets.to(self._device)
-
-                    if self._old_network is None:
-                        raise RuntimeError("No teacher network for KD")
-                    with torch.no_grad():
-                        teacher_outputs = self._old_network(inputs)["logits"]
-
-                    student_outputs = self._network(inputs)["logits"]
-                    kd = _KD_loss(student_outputs[:, :self._known_classes], teacher_outputs, self.T)
+                    logits = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
-                    ce_loss = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
-                    kd_loss = 5*kd + ce_loss
+                    loss_clf = F.cross_entropy(
+                    logits[:, self._known_classes :], fake_targets
+                    )
+                    loss_kd = _KD_loss(
+                    logits[:, : self._known_classes],
+                    self._old_network(inputs)["logits"],
+                    T,
+                    )
+
+                    loss = 10 * loss_kd + loss_clf
 
                     optimizer.zero_grad()
-                    kd_loss.backward()
+                    loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
-                    
                     optimizer.step()
 
-                    losses += kd_loss.item()
-                    _, preds = torch.max(student_outputs, dim=1)
-                    correct += preds.eq(targets).cpu().sum().item()
-                    total += targets.size(0)    
+                    losses += loss.item()
+                    with torch.no_grad():
+                        _, preds = torch.max(logits, dim=1)
+                        correct += preds.eq(targets.expand_as(preds)).cpu().sum()
+                        total += len(targets)
                 theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                 self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out) 
@@ -693,9 +687,7 @@ class LwF(BaseLearner):
             prog_bar.set_description(info)
         logging.info(info)
 
-def _KD_loss(student_logits, teacher_logits, T=2.0):
-    return F.kl_div(
-        F.log_softmax(student_logits / T, dim=-1),
-        F.softmax(teacher_logits / T, dim=-1),
-        reduction="batchmean"
-    ) * (T * T)
+def _KD_loss(pred, soft, T):
+    pred = torch.log_softmax(pred / T, dim=1)
+    soft = torch.softmax(soft / T, dim=1)
+    return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
