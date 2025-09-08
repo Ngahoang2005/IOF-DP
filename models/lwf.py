@@ -781,9 +781,6 @@ class IPTScore:
         self.ipt_outer = {} 
         self.exp_avg_ipt_outer = {}
         self.exp_avg_unc_outer = {}
-        self.ipt_inner = {} 
-        self.exp_avg_ipt_inner = {}
-        self.exp_avg_unc_inner = {}
         self.taylor = taylor
         self.tau = tau
         print(f"self.taylor is: {self.taylor}")
@@ -816,115 +813,22 @@ class IPTScore:
                     self.exp_avg_ipt_outer[n] = self.beta1 * self.exp_avg_ipt_outer[n] + (1-self.beta1)*self.ipt_outer[n]
                     # Update uncertainty 
                     self.exp_avg_unc_outer[n] = self.beta2 * self.exp_avg_unc_outer[n] + (1-self.beta2)*(self.ipt_outer[n]-self.exp_avg_ipt_outer[n]).abs()
-    def update_ipt_inner(self, model, global_step): 
-        for n,p in model.named_parameters():
-            if "fc" in n:   # bỏ qua tất cả tham số có 'fc' trong tên
-                continue
-            if p.requires_grad:
-                if torch.isnan(p.grad).any():
-                    print(f"{n},梯度中存在 NaN 值")
-                    #print(p.grad)
-                    print(f"step is {global_step}")
-                    break 
-                if n not in self.ipt_inner:
-                    self.ipt_inner[n] = torch.zeros_like(p)
-                    self.exp_avg_ipt_inner[n] = torch.zeros_like(p) 
-                    self.exp_avg_unc_inner[n] = torch.zeros_like(p) 
-                with torch.no_grad():
-                    # Calculate sensitivity 
-                    self.ipt_inner[n] = (p * p.grad).abs().detach()
-                    if self.taylor in ['param_second']:
-                        self.ipt_inner[n] = (p * p.grad * p * p.grad).abs().detach()
-                    elif self.taylor in ['param_mix']:
-                        self.ipt_inner[n] = (p * p.grad - 0.5 * p * p.grad * p * p.grad).abs().detach()
-
-                    # Update sensitivity 
-                    self.exp_avg_ipt_inner[n] = self.beta1 * self.exp_avg_ipt_inner[n] + (1-self.beta1)*self.ipt_inner[n]
-                    # Update uncertainty 
-                    self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
     def normalize_importance_scores(self, ipt_score_dic):
-    
         all_scores_tensor = torch.cat([score.flatten() for score in ipt_score_dic.values()])
-    
         min_score = torch.min(all_scores_tensor)
         max_score = torch.max(all_scores_tensor)
         normalized_dic = {}
         for n, score in ipt_score_dic.items():
             normalized_dic[n] = (score - min_score) / (max_score - min_score)
-
-
         all_scores_tensor = torch.cat([score.flatten() for score in normalized_dic.values()])
         min_score = torch.min(all_scores_tensor)
         max_score = torch.max(all_scores_tensor)
         #sys.exit(1)
         return normalized_dic
 
-    def calculate_score_inner(self, p=None, metric="ipt"):
-        assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
-    
-        ipt_score_dic_inner = {}
-        for n in self.exp_avg_ipt_inner:
-            #print(f"name is {n}")
-            #ipt_name_list.append(n)
-            if metric == "ipt":
-                # Combine the senstivity and uncertainty 
-                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
-                #ipt_score = self.exp_avg_ipt_inner[n]
-            elif metric == "mag":
-                ipt_score = p.abs().detach().clone() 
-            else:
-                raise ValueError("Unexcptected Metric: %s"%metric)
-            ipt_score_dic_inner[n] = ipt_score
-        assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
-        
-        
-        ipt_score_dic_outer = {}
-        for n in self.exp_avg_ipt_outer:
-            if metric == "ipt":
-                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
-                #ipt_score = self.exp_avg_ipt_outer[n]
-            elif metric == "mag":
-                ipt_score = p.abs().detach().clone() 
-            else:
-                raise ValueError("Unexcptected Metric: %s"%metric)
-            ipt_score_dic_outer[n] = ipt_score
-        ipt_score_dic_inner_norm = self.normalize_importance_scores(ipt_score_dic_inner)
-        ipt_score_dic_outer_norm = self.normalize_importance_scores(ipt_score_dic_outer)
-
-        inner_mask = {}
-
-        for key in ipt_score_dic_inner_norm:
-            assert key in ipt_score_dic_outer_norm
-            ipt_score_inner = ipt_score_dic_inner_norm[key].cpu().numpy()
-            ipt_score_outer = ipt_score_dic_outer_norm[key].cpu().numpy()
-
-            exp_term_inner = np.exp(ipt_score_inner / self.tau)
-            exp_term_outer = np.exp(ipt_score_outer / self.tau)
-            denominator = exp_term_inner + exp_term_outer
-            coefficient_inner = exp_term_inner / denominator
-            inner_mask[key] = coefficient_inner
-            inner_mask[key] = torch.tensor(coefficient_inner, device=ipt_score_dic_inner[key].device)
-        return inner_mask
-
     def calculate_score_outer(self, p=None, metric="ipt"):
-        assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
-
-        ipt_score_dic_inner = {}
-        for n in self.exp_avg_ipt_inner:
-            if metric == "ipt":
-                # Combine the senstivity and uncertainty 
-                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
-                #ipt_score = self.exp_avg_ipt_inner[n]
-            elif metric == "mag":
-                ipt_score = p.abs().detach().clone() 
-            else:
-                raise ValueError("Unexcptected Metric: %s"%metric)
-        
-            ipt_score_dic_inner[n] = ipt_score
 
         assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
-        
-        
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
         
@@ -940,32 +844,15 @@ class IPTScore:
             
             ipt_score_dic_outer[n] = ipt_score
 
-     
-        ipt_score_dic_inner_norm = self.normalize_importance_scores(ipt_score_dic_inner)
         ipt_score_dic_outer_norm = self.normalize_importance_scores(ipt_score_dic_outer)
 
         outer_mask = {}
 
-        for key in ipt_score_dic_inner_norm:
-            assert key in ipt_score_dic_outer_norm
-            ipt_score_inner = ipt_score_dic_inner_norm[key].cpu().numpy()
-            ipt_score_outer = ipt_score_dic_outer_norm[key].cpu().numpy()
-         
-            exp_term_inner = np.exp(ipt_score_inner / self.tau)
-            exp_term_outer = np.exp(ipt_score_outer / self.tau)
-        
-            denominator = exp_term_inner + exp_term_outer
-            
-            coefficient_outer = exp_term_outer / denominator
-
-            outer_mask[key] = torch.tensor(coefficient_outer, device=ipt_score_dic_outer[key].device)
- 
-
+        for key, score in ipt_score_dic_outer_norm.items():
+            exp_term = torch.exp(score / self.tau)
+            coeff = exp_term / (exp_term + 1.0)   # chỉ có outer → so với "1"
+            outer_mask[key] = coeff.to(score.device)
         return outer_mask
-    
-    def update_inner_score(self, model, global_step):
-
-        self.update_ipt_inner(model, global_step)
     
     def update_outer_score(self, model, global_step):
       
