@@ -706,14 +706,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 20
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 20
+epochs = 100
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -1383,7 +1383,7 @@ class LwF(BaseLearner):
                     else:
                         loss_kd = torch.tensor(0.0, device=inputs.device)
 
-                    loss_outer = loss_kd  
+                    loss_outer = 10 * loss_kd + loss_clf
                     loss_outer.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
