@@ -1383,7 +1383,7 @@ class LwF(BaseLearner):
                     else:
                         loss_kd = torch.tensor(0.0, device=inputs.device)
 
-                    loss_outer = 10 * loss_kd + loss_clf
+                    loss_outer = loss_kd  
                     loss_outer.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
