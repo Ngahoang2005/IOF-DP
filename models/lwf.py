@@ -1219,7 +1219,7 @@ class LwF(BaseLearner):
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
                         data_iter = iter(train_loader)
-                    _, inputs, targets = next(data_iter)
+                        _, inputs, targets = next(data_iter)
                     inputs, targets = inputs.to(self._device), targets.to(self._device)
                     logits = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
