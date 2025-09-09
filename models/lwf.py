@@ -1231,7 +1231,7 @@ class LwF(BaseLearner):
                     self._old_network(inputs)["logits"],
                     T,
                     )
-                    loss = 10 * loss_kd + loss_clf
+                    loss = 10 * loss_kd 
                     optimizer.zero_grad()
                     loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
