@@ -1265,50 +1265,63 @@ class LwF(BaseLearner):
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
             self._network.train()
-            losses = 0
+            losses_inner = 0.0
+            losses_outer = 0.0
             correct, total = 0, 0
 
-            data_iter = iter(train_loader)
             for i, (_, inputs, targets) in enumerate(train_loader):
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
                 logits = self._network(inputs)["logits"]
 
-                fake_targets = targets - self._known_classes
-                loss_clf = F.cross_entropy(
-                    logits[:, self._known_classes :], fake_targets
-                )
-                loss_kd = _KD_loss(
-                    logits[:, : self._known_classes],
-                    self._old_network(inputs)["logits"],
-                    T,
-                )
+                # fake_targets = targets - self._known_classes
+                # loss_clf = F.cross_entropy(
+                #     logits[:, self._known_classes :], fake_targets
+                # )
+                # loss_kd = _KD_loss(
+                #     logits[:, : self._known_classes],
+                #     self._old_network(inputs)["logits"],
+                #     T,
+                # )
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 for _ in range(1):
-                    loss_clf.backward()
+                    optimizer.zero_grad()  
+                    logits = self._network(inputs)["logits"]    # recompute forward each inner step
+                    fake_targets = targets - self._known_classes
+                    loss_inner = F.cross_entropy(logits[:, self._known_classes:], fake_targets)
+                    loss_inner.backward()
                     self.ipt_score.update_inner_score(self._network, epoch)
                     optimizer.step()
-    
-                    losses += loss_clf.item()
-                    _, preds = torch.max(logits, dim=1)
-                    correct += preds.eq(targets).cpu().sum().item()
-                    total += targets.size(0)
+                    losses_inner += loss_inner.item()
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                 # === 1 bước OUTER ===
                 for _ in range(1): 
                     optimizer.zero_grad()
-                    loss_kd.backward()
+                    logits = self._network(inputs)["logits"]
+                    fake_targets = targets - self._known_classes
+                    loss_clf = F.cross_entropy(logits[:, self._known_classes:], fake_targets)
+                    if self._old_network is not None:
+                        with torch.no_grad():
+                            teacher_logits = self._old_network(inputs)["logits"][:, : self._known_classes]
+                        loss_kd = _KD_loss(logits[:, : self._known_classes], teacher_logits, self.T)
+                    else:
+                        loss_kd = torch.tensor(0.0, device=inputs.device)
+                    loss_outer = lamda * loss_kd + loss_clf
+                    loss_outer.backward()
+                    loss_outer.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
 
-                    losses += loss_kd.item()
-                    with torch.no_grad():
-                        _, preds = torch.max(logits, dim=1)
-                        correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-                        total += len(targets)
+                    losses_outer += loss_outer.item()
                 theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                 self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out) 
+
+                with torch.no_grad():
+                    logits_final = self._network(inputs)["logits"]   # recompute after final param copy
+                    _, preds = torch.max(logits_final, dim=1)
+                    correct += preds.eq(targets).cpu().sum().item()
+                    total += targets.size(0)
             scheduler.step()
             train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
             test_acc = self._compute_accuracy(self._network, test_loader)
@@ -1316,7 +1329,7 @@ class LwF(BaseLearner):
                 self._cur_task,
                 epoch + 1,
                 epochs,
-                losses / len(train_loader),
+                losses_inner / len(train_loader),
                 train_acc,
                 test_acc,
             )
