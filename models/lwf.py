@@ -706,14 +706,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 20
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 20
+epochs = 100 
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -1270,6 +1270,7 @@ class LwF(BaseLearner):
             correct, total = 0, 0
 
             for i, (_, inputs, targets) in enumerate(train_loader):
+                inputs, targets = inputs.to(self._device), targets.to(self._device)
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 for _ in range(1):
                     optimizer.zero_grad()  
@@ -1282,6 +1283,7 @@ class LwF(BaseLearner):
                     losses_inner += loss_inner.item()
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
+                # === 1 bước OUTER ===
                 for _ in range(1): 
                     optimizer.zero_grad()
                     logits = self._network(inputs)["logits"]
