@@ -1270,18 +1270,6 @@ class LwF(BaseLearner):
             correct, total = 0, 0
 
             for i, (_, inputs, targets) in enumerate(train_loader):
-                inputs, targets = inputs.to(self._device), targets.to(self._device)
-                logits = self._network(inputs)["logits"]
-
-                # fake_targets = targets - self._known_classes
-                # loss_clf = F.cross_entropy(
-                #     logits[:, self._known_classes :], fake_targets
-                # )
-                # loss_kd = _KD_loss(
-                #     logits[:, : self._known_classes],
-                #     self._old_network(inputs)["logits"],
-                #     T,
-                # )
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 for _ in range(1):
                     optimizer.zero_grad()  
@@ -1294,7 +1282,6 @@ class LwF(BaseLearner):
                     losses_inner += loss_inner.item()
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
-                # === 1 bước OUTER ===
                 for _ in range(1): 
                     optimizer.zero_grad()
                     logits = self._network(inputs)["logits"]
