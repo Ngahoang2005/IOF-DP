@@ -1095,6 +1095,7 @@ class LwF(BaseLearner):
             scheduler = optim.lr_scheduler.MultiStepLR(
                 optimizer=optimizer, milestones=milestones, gamma=lrate_decay
             )
+            self._update_representation(train_loader, test_loader, optimizer, scheduler)
     def _init_train(self, train_loader, test_loader, optimizer, scheduler):
         prog_bar = tqdm(range(init_epoch))
         for _, epoch in enumerate(prog_bar):
@@ -1214,6 +1215,11 @@ class LwF(BaseLearner):
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                 # === 1 bước OUTER ===
                 for _ in range(5): 
+                    try:
+                        _, inputs, targets = next(data_iter)
+                    except StopIteration:
+                        data_iter = iter(train_loader)
+                    _, inputs, targets = next(data_iter)
                     inputs, targets = inputs.to(self._device), targets.to(self._device)
                     logits = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
