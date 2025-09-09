@@ -991,11 +991,6 @@ class LwF(BaseLearner):
         else:
             self._network = IncrementalNet(args, False)
 
-        self._protos = []
-        self.al_classifier = None
-        if self.args["DPCR"]:
-            self._covs = []
-            self._projectors = []
         self._old_network = None 
         self.ipt_score = IPTScore(self._network, beta1=0.55, beta2=0.55, tau=0.1)
         self.T = args.get("T", 2.0)
