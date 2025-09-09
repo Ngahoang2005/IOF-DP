@@ -1181,7 +1181,8 @@ class LwF(BaseLearner):
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
             self._network.train()
-            losses = 0.0
+            losses_inner = 0.0
+            losses_outer = 0.0
             correct, total = 0, 0
 
             data_iter = iter(train_loader)
@@ -1207,7 +1208,7 @@ class LwF(BaseLearner):
                     self.ipt_score.update_inner_score(self._network, epoch)
                     optimizer.step()
     
-                    losses += loss_inner.item()
+                    losses_inner += loss_inner.item()
                     _, preds = torch.max(student_outputs, dim=1)
                     correct += preds.eq(targets).cpu().sum().item()
                     total += targets.size(0)
@@ -1237,7 +1238,7 @@ class LwF(BaseLearner):
                     self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
 
-                    losses += loss.item()
+                    losses_outer += loss.item()
                     with torch.no_grad():
                         _, preds = torch.max(logits, dim=1)
                         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
@@ -1253,7 +1254,7 @@ class LwF(BaseLearner):
                 self._cur_task,
                 epoch + 1,
                 epochs,
-                losses / len(train_loader),
+                losses_inner / len(train_loader),
                 train_acc,
                 test_acc,
             )
