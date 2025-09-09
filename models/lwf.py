@@ -1187,10 +1187,10 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
 
-            for cycle in range(12):  # 32 chu kỳ
+            for cycle in range(10):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                for _ in range(5 - int(self._cur_task / 2)):
+                for _ in range(max(1, 5 - int(self._cur_task))):
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
