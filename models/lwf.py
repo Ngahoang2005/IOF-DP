@@ -706,14 +706,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 20
+init_epoch = 1
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 20
+epochs = 1
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -760,7 +760,6 @@ class IPTScore:
         init_warmup:int, 
         beta1:float, 
         beta2:float, 
-        rank:int,
         quantile:float,  # 01mask转换
         taylor = None, # 表示用几阶梯度来做为重要性指标 param_second, param_first, param_mix
     ):
@@ -768,7 +767,6 @@ class IPTScore:
         self.beta2 = beta2
         self.model = model
         self.initial_warmup = init_warmup
-        self.rank = rank
         self.ipt_outer = {} 
         self.exp_avg_ipt_outer = {}
         self.exp_avg_unc_outer = {}
@@ -776,7 +774,8 @@ class IPTScore:
         self.exp_avg_ipt_inner = {}
         self.exp_avg_unc_inner = {}
         self.taylor = taylor
-        self.tau = tau
+        self.quantile = quantile
+        
         print(f"self.taylor is: {self.taylor}")
         print(f"self.tau is: {self.tau}")
         assert (self.beta1<1 and self.beta1>0)
@@ -831,23 +830,7 @@ class IPTScore:
                     self.exp_avg_ipt_inner[n] = self.beta1 * self.exp_avg_ipt_inner[n] + (1-self.beta1)*self.ipt_inner[n]
                     # Update uncertainty 
                     self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
-    def normalize_importance_scores(self, ipt_score_dic):
     
-        all_scores_tensor = torch.cat([score.flatten() for score in ipt_score_dic.values()])
-    
-        min_score = torch.min(all_scores_tensor)
-        max_score = torch.max(all_scores_tensor)
-        normalized_dic = {}
-        for n, score in ipt_score_dic.items():
-            normalized_dic[n] = (score - min_score) / (max_score - min_score)
-
-
-        all_scores_tensor = torch.cat([score.flatten() for score in normalized_dic.values()])
-        min_score = torch.min(all_scores_tensor)
-        max_score = torch.max(all_scores_tensor)
-        #sys.exit(1)
-        return normalized_dic
-
     def calculate_score_inner(self, p=None, metric="ipt"):
         assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
     
@@ -982,7 +965,7 @@ class LwF(BaseLearner):
             self._network = IncrementalNet(args, False)
 
         self._old_network = None 
-        self.ipt_score = IPTScore(self._network, beta1=0.55, beta2=0.55, tau=0.1)
+        self.ipt_score = IPTScore(self._network, init_warmup=50,beta1=0.55, beta2=0.55, quantile=0.8, taylor='param_first')
         self.T = args.get("T", 2.0)
     def after_task(self):
         self._old_network = self._network.copy().freeze()
