@@ -964,7 +964,7 @@ class LwF(BaseLearner):
             self._network = IncrementalNet(args, False)
 
         self._old_network = None 
-        self.ipt_score = IPTScore(self._network, init_warmup=50,beta1=0.55, beta2=0.55, quantile=0.8, taylor='param_first')
+        self.ipt_score = IPTScore(self._network, init_warmup=50,beta1=0.85, beta2=0.85, quantile=0.8, taylor='param_first')
         self.T = args.get("T", 2.0)
     def after_task(self):
         self._old_network = self._network.copy().freeze()
@@ -1162,7 +1162,7 @@ class LwF(BaseLearner):
             for cycle in range(10):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                for _ in range(3):
+                for _ in range(max(1,5 - int(self._cur_task))):
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
@@ -1187,7 +1187,7 @@ class LwF(BaseLearner):
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                 # === 1 bước OUTER ===
-                for _ in range(3): 
+                for _ in range(4): 
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
