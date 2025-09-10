@@ -1176,7 +1176,7 @@ class LwF(BaseLearner):
                 if n in final_delta:
                     p.copy_(theta_t[n] + final_delta[n])
     
-     def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
+    def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
 
         prog_bar = tqdm(range(epochs))
         for _, epoch in enumerate(prog_bar):
