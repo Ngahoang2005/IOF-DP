@@ -706,14 +706,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 2
+init_epoch = 20
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 2
+epochs = 20
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -757,14 +757,18 @@ EPSILON = 1e-8
 class IPTScore:
     def __init__(
         self, model, 
+        init_warmup:int, 
         beta1:float, 
         beta2:float, 
-        tau:float,  # 01mask转换
+        rank:int,
+        quantile:float,  # 01mask转换
         taylor = None, # 表示用几阶梯度来做为重要性指标 param_second, param_first, param_mix
     ):
         self.beta1 = beta1
         self.beta2 = beta2
         self.model = model
+        self.initial_warmup = init_warmup
+        self.rank = rank
         self.ipt_outer = {} 
         self.exp_avg_ipt_outer = {}
         self.exp_avg_unc_outer = {}
@@ -788,7 +792,6 @@ class IPTScore:
                     print(f"{n},外层循环梯度中存在 NaN 值")
                     #print(p.grad)
                     print(f"step is {global_step}")
-                    sys.exit(1) 
                 if n not in self.ipt_outer:
                     self.ipt_outer[n] = torch.zeros_like(p)
                     self.exp_avg_ipt_outer[n] = torch.zeros_like(p) 
@@ -861,90 +864,66 @@ class IPTScore:
             else:
                 raise ValueError("Unexcptected Metric: %s"%metric)
             ipt_score_dic_inner[n] = ipt_score
-        assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
-        ipt_score_dic_outer = {}
-        for n in self.exp_avg_ipt_outer:
-            if metric == "ipt":
-                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
-                #ipt_score = self.exp_avg_ipt_outer[n]
-            elif metric == "mag":
-                ipt_score = p.abs().detach().clone() 
-            else:
-                raise ValueError("Unexcptected Metric: %s"%metric)
-            ipt_score_dic_outer[n] = ipt_score
-        ipt_score_dic_inner_norm = self.normalize_importance_scores(ipt_score_dic_inner)
-        ipt_score_dic_outer_norm = self.normalize_importance_scores(ipt_score_dic_outer)
-
         inner_mask = {}
-
-        for key in ipt_score_dic_inner_norm:
-            assert key in ipt_score_dic_outer_norm
-            ipt_score_inner = ipt_score_dic_inner_norm[key].cpu().numpy()
-            ipt_score_outer = ipt_score_dic_outer_norm[key].cpu().numpy()
-
-            exp_term_inner = np.exp(ipt_score_inner / self.tau)
-            exp_term_outer = np.exp(ipt_score_outer / self.tau)
-            denominator = exp_term_inner + exp_term_outer
-            coefficient_inner = exp_term_inner / denominator
-            inner_mask[key] = coefficient_inner
-            inner_mask[key] = torch.tensor(coefficient_inner, device=ipt_score_dic_inner[key].device)
+        for n, score in ipt_score_dic_inner.items():
+            #print(n, score)
+            # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
+            threshold = torch.quantile(score, self.quantile)
+            inner_mask[n] = (score > threshold).float()
+            #print("after 01mask")
+            #print(n, score)
         return inner_mask
 
-    def calculate_score_outer(self, p=None, metric="ipt"):
-        assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
-
-        ipt_score_dic_inner = {}
-        for n in self.exp_avg_ipt_inner:
-            if metric == "ipt":
-                # Combine the senstivity and uncertainty 
-                ipt_score = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
-                #ipt_score = self.exp_avg_ipt_inner[n]
-            elif metric == "mag":
-                ipt_score = p.abs().detach().clone() 
-            else:
-                raise ValueError("Unexcptected Metric: %s"%metric)
-        
-            ipt_score_dic_inner[n] = ipt_score
-
+    def calculate_score_outer_local(self, p=None, metric="ipt"):
         assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
         
         
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
-        
+            #print(f"name is {n}")
+            #ipt_name_list.append(n)
             if metric == "ipt":
-            
+                # Combine the senstivity and uncertainty 
                 ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
-                #ipt_score = self.exp_avg_ipt_outer[n]
             elif metric == "mag":
                 ipt_score = p.abs().detach().clone() 
             else:
                 raise ValueError("Unexcptected Metric: %s"%metric)
-          
+            ipt_score_dic_outer[n] = ipt_score
+
+        outer_mask = {}
+        for n, score in ipt_score_dic_outer.items():
+            threshold = torch.quantile(score, self.quantile)
+            outer_mask[n] = (score > threshold).float()
+ 
+        return outer_mask
+    
+    def calculate_score_outer(self, p=None, metric="ipt"):
+        assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
+        
+        
+        ipt_score_dic_outer = {}
+        for n in self.exp_avg_ipt_outer:
+            #print(f"name is {n}")
+            #ipt_name_list.append(n)
+            if metric == "ipt":
+                # Combine the senstivity and uncertainty 
+                ipt_score = self.exp_avg_ipt_outer[n] * self.exp_avg_unc_outer[n]
+            elif metric == "mag":
+                ipt_score = p.abs().detach().clone() 
+            else:
+                raise ValueError("Unexcptected Metric: %s"%metric)
             
             ipt_score_dic_outer[n] = ipt_score
 
-     
-        ipt_score_dic_inner_norm = self.normalize_importance_scores(ipt_score_dic_inner)
-        ipt_score_dic_outer_norm = self.normalize_importance_scores(ipt_score_dic_outer)
+        all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
+        threshold = torch.quantile(all_scores, self.quantile)
 
         outer_mask = {}
+        for n, score in ipt_score_dic_outer.items():
 
-        for key in ipt_score_dic_inner_norm:
-            assert key in ipt_score_dic_outer_norm
-            ipt_score_inner = ipt_score_dic_inner_norm[key].cpu().numpy()
-            ipt_score_outer = ipt_score_dic_outer_norm[key].cpu().numpy()
-         
-            exp_term_inner = np.exp(ipt_score_inner / self.tau)
-            exp_term_outer = np.exp(ipt_score_outer / self.tau)
-        
-            denominator = exp_term_inner + exp_term_outer
-            
-            coefficient_outer = exp_term_outer / denominator
-
-            outer_mask[key] = torch.tensor(coefficient_outer, device=ipt_score_dic_outer[key].device)
- 
-
+            outer_mask[n] = (score > threshold).float()
+           
         return outer_mask
     
     def update_inner_score(self, model, global_step):
@@ -952,8 +931,19 @@ class IPTScore:
         self.update_ipt_inner(model, global_step)
     
     def update_outer_score(self, model, global_step):
-      
         self.update_ipt_outer(model, global_step)
+
+
+    def empty_inner_score(self):
+        self.ipt_inner = {} 
+        self.exp_avg_ipt_inner = {}
+        self.exp_avg_unc_inner = {}
+
+    def empty_outer_score(self):
+        self.ipt_outer = {} 
+        self.exp_avg_ipt_outer = {}
+        self.exp_avg_unc_outer = {}
+
 
 class LwF(BaseLearner):
     def __init__(self, args):
@@ -1143,6 +1133,7 @@ class LwF(BaseLearner):
 
 
     def update_parameters_with_task_vectors(self, theta_t, delta_in, delta_out):
+        
         inner_mask = self.ipt_score.calculate_score_inner(metric="ipt")
         outer_mask = self.ipt_score.calculate_score_outer(metric="ipt")
         
@@ -1150,14 +1141,13 @@ class LwF(BaseLearner):
             inner = inner_mask[n]
             outer = outer_mask[n]
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
+
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] = 0.4
-            outer[both_one] = 0.6
-            
+            inner[both_one] = 0.3
+            outer[both_one] = 0.7
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.5
             outer[both_zero] = 0.5
-        
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
@@ -1172,152 +1162,95 @@ class LwF(BaseLearner):
         )
         final_delta = {n: inner_mask[n] * delta_in[n] + outer_mask[n] * delta_out[n] for n in theta_t}
         with torch.no_grad():
-            for n, p in self._network.named_parameters():
+            for n, p in self.model.named_parameters():
                 if n in final_delta:
                     p.copy_(theta_t[n] + final_delta[n])
-    
-    def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
 
+
+    def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
         prog_bar = tqdm(range(epochs))
-        for _, epoch in enumerate(prog_bar):
-
+        for epoch in prog_bar:
             self._network.train()
-            losses = 0.0
+            losses_inner = 0.0
+            losses_outer = 0.0
             correct, total = 0, 0
-            for i, (_, inputs, targets) in enumerate(train_loader):
-                print(i)
-                inputs, targets = inputs.to(self._device), targets.to(self._device)
-                logits = self._network(inputs)["logits"]
 
-                fake_targets = targets - self._known_classes
-                loss_clf = F.cross_entropy(
+            data_iter = iter(train_loader)
+
+            for cycle in range(10):  # 32 chu kỳ
+                # === 4 bước INNER ===
+                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
+                for _ in range(max(1, 5 - int(self._cur_task))):
+                    try:
+                        _, inputs, targets = next(data_iter)
+                    except StopIteration:
+                        data_iter = iter(train_loader)
+                        _, inputs, targets = next(data_iter)
+
+
+                    inputs, targets = inputs.to(self._device), targets.to(self._device)
+                    student_outputs = self._network(inputs)["logits"]
+                    fake_targets = targets - self._known_classes
+                    loss_inner = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
+
+                    optimizer.zero_grad()
+                    loss_inner.backward()
+                    self.ipt_score.update_inner_score(self._network, epoch)
+                    optimizer.step()
+    
+                    losses_inner += loss_inner.item()
+                    _, preds = torch.max(student_outputs, dim=1)
+                    correct += preds.eq(targets).cpu().sum().item()
+                    total += targets.size(0)
+                theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
+                delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
+                # === 1 bước OUTER ===
+                for _ in range(5): 
+                    try:
+                        _, inputs, targets = next(data_iter)
+                    except StopIteration:
+                        data_iter = iter(train_loader)
+                        _, inputs, targets = next(data_iter)
+                    inputs, targets = inputs.to(self._device), targets.to(self._device)
+                    logits = self._network(inputs)["logits"]
+                    fake_targets = targets - self._known_classes
+                    loss_clf = F.cross_entropy(
                     logits[:, self._known_classes :], fake_targets
-                )
-                loss_kd = _KD_loss(
+                    )
+                    loss_kd = _KD_loss(
                     logits[:, : self._known_classes],
                     self._old_network(inputs)["logits"],
                     T,
-                )
+                    )
+                    loss = 10 * loss_kd  + loss_clf
+                    optimizer.zero_grad()
+                    loss.backward()
+                    self.ipt_score.update_outer_score(self._network, epoch)
+                    optimizer.step()
 
-                loss = lamda * loss_kd + loss_clf
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                losses += loss.item()
-
-                with torch.no_grad():
-                    _, preds = torch.max(logits, dim=1)
-                    correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-                    total += len(targets)
-
+                    losses_outer += loss.item()
+                    with torch.no_grad():
+                        _, preds = torch.max(logits, dim=1)
+                        correct += preds.eq(targets.expand_as(preds)).cpu().sum()
+                        total += len(targets)
+                theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
+                delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
+                self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out) 
+            # ---- epoch end ----
             scheduler.step()
-            train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-            if epoch % 25 == 0:
-                test_acc = self._compute_accuracy(self._network, test_loader)
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    epochs,
-                    losses / len(train_loader),
-                    train_acc,
-                    test_acc,
-                )
-            else:
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    epochs,
-                    losses / len(train_loader),
-                    train_acc,
-                )
+            train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
+            test_acc = self._compute_accuracy(self._network, test_loader)
+            info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
+                self._cur_task,
+                epoch + 1,
+                epochs,
+                losses_inner / len(train_loader),
+                train_acc,
+                test_acc,
+            )
             prog_bar.set_description(info)
         logging.info(info)
-
-    # def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
-    #     prog_bar = tqdm(range(epochs))
-    #     for epoch in prog_bar:
-    #         self._network.train()
-    #         losses_inner = 0.0
-    #         losses_outer = 0.0
-    #         correct, total = 0, 0
-
-    #         data_iter = iter(train_loader)
-
-    #         for cycle in range(10):  # 32 chu kỳ
-    #             # === 4 bước INNER ===
-    #             theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-    #             for _ in range(max(1, 5 - int(self._cur_task))):
-    #                 try:
-    #                     _, inputs, targets = next(data_iter)
-    #                 except StopIteration:
-    #                     data_iter = iter(train_loader)
-    #                     _, inputs, targets = next(data_iter)
-
-
-    #                 inputs, targets = inputs.to(self._device), targets.to(self._device)
-    #                 student_outputs = self._network(inputs)["logits"]
-    #                 fake_targets = targets - self._known_classes
-    #                 loss_inner = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
-
-    #                 optimizer.zero_grad()
-    #                 loss_inner.backward()
-    #                 self.ipt_score.update_inner_score(self._network, epoch)
-    #                 optimizer.step()
-    
-    #                 losses_inner += loss_inner.item()
-    #                 _, preds = torch.max(student_outputs, dim=1)
-    #                 correct += preds.eq(targets).cpu().sum().item()
-    #                 total += targets.size(0)
-    #             theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-    #             delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
-    #             # === 1 bước OUTER ===
-    #             for _ in range(5): 
-    #                 try:
-    #                     _, inputs, targets = next(data_iter)
-    #                 except StopIteration:
-    #                     data_iter = iter(train_loader)
-    #                     _, inputs, targets = next(data_iter)
-    #                 inputs, targets = inputs.to(self._device), targets.to(self._device)
-    #                 logits = self._network(inputs)["logits"]
-    #                 fake_targets = targets - self._known_classes
-    #                 loss_clf = F.cross_entropy(
-    #                 logits[:, self._known_classes :], fake_targets
-    #                 )
-    #                 loss_kd = _KD_loss(
-    #                 logits[:, : self._known_classes],
-    #                 self._old_network(inputs)["logits"],
-    #                 T,
-    #                 )
-    #                 loss = 10 * loss_kd  + loss_clf
-    #                 optimizer.zero_grad()
-    #                 loss.backward()
-    #                 self.ipt_score.update_outer_score(self._network, epoch)
-    #                 optimizer.step()
-
-    #                 losses_outer += loss.item()
-    #                 with torch.no_grad():
-    #                     _, preds = torch.max(logits, dim=1)
-    #                     correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-    #                     total += len(targets)
-    #             theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-    #             delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
-    #             self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out) 
-    #         # ---- epoch end ----
-    #         scheduler.step()
-    #         train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
-    #         test_acc = self._compute_accuracy(self._network, test_loader)
-    #         info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-    #             self._cur_task,
-    #             epoch + 1,
-    #             epochs,
-    #             losses_inner / len(train_loader),
-    #             train_acc,
-    #             test_acc,
-    #         )
-    #         prog_bar.set_description(info)
-    #     logging.info(info)
-
+# =
     # def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
     #     prog_bar = tqdm(range(epochs))
     #     for epoch in prog_bar:
