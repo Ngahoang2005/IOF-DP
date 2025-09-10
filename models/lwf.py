@@ -1162,7 +1162,7 @@ class LwF(BaseLearner):
             for cycle in range(10):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                for _ in range(max(1, 5 - int(self._cur_task))):
+                for _ in range(3):
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
@@ -1187,7 +1187,7 @@ class LwF(BaseLearner):
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                 # === 1 bước OUTER ===
-                for _ in range(5): 
+                for _ in range(3): 
                     try:
                         _, inputs, targets = next(data_iter)
                     except StopIteration:
@@ -1204,7 +1204,7 @@ class LwF(BaseLearner):
                     self._old_network(inputs)["logits"],
                     T,
                     )
-                    loss = 10 * loss_kd  + loss_clf
+                    loss = 10 * loss_kd
                     optimizer.zero_grad()
                     loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
