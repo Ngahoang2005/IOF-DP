@@ -777,7 +777,6 @@ class IPTScore:
         self.quantile = quantile
         
         print(f"self.taylor is: {self.taylor}")
-        print(f"self.tau is: {self.tau}")
         assert (self.beta1<1 and self.beta1>0)
         assert (self.beta2<1 and self.beta2>0)
 
