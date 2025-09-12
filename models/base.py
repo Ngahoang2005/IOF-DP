@@ -22,7 +22,7 @@ class BaseLearner(object):
         self._old_network = None
         self._data_memory, self._targets_memory = np.array([]), np.array([])
         self.topk = 5
-        #self.num_per_class = 500
+        self.num_per_class = 500
         self._memory_size = args["memory_size"]
         self._memory_per_class = args.get("memory_per_class", None)
         self._fixed_memory = args.get("fixed_memory", False)
@@ -101,38 +101,38 @@ class BaseLearner(object):
         else:
             return (self._data_memory, self._targets_memory)
 
-    def _compute_accuracy(self, model, loader):
-        model.eval()
-        correct, total = 0, 0
-        for i, (_, inputs, targets) in enumerate(loader):
-            inputs = inputs.to(self._device)
-            with torch.no_grad():
-                outputs = model(inputs)["logits"]
-            predicts = torch.max(outputs, dim=1)[1]
-            correct += (predicts.cpu() == targets).sum()
-            total += len(targets)
-
-        return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-
-    # def _eval_cnn(self, loader):
-    #     self._network.eval()
-    #     y_pred, y_true = [], []
-
-    #     for _, (_, inputs, targets) in enumerate(loader):
+    # def _compute_accuracy(self, model, loader):
+    #     model.eval()
+    #     correct, total = 0, 0
+    #     for i, (_, inputs, targets) in enumerate(loader):
     #         inputs = inputs.to(self._device)
     #         with torch.no_grad():
-    #             outputs = self._network(inputs)["features"]
-    #             _, outputs = self.al_classifier(outputs)
-    #         predicts = torch.topk(
-    #             outputs, k=self.topk, dim=1, largest=True, sorted=True
-    #         )[
-    #             1
-    #         ]  # [bs, topk]
-    #         y_pred.append(predicts.cpu().numpy())
-    #         y_true.append(targets.cpu().numpy())
+    #             outputs = model(inputs)["logits"]
+    #         predicts = torch.max(outputs, dim=1)[1]
+    #         correct += (predicts.cpu() == targets).sum()
+    #         total += len(targets)
+
+    #     return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
+
+    def _eval_cnn(self, loader):
+        self._network.eval()
+        y_pred, y_true = [], []
+
+        for _, (_, inputs, targets) in enumerate(loader):
+            inputs = inputs.to(self._device)
+            with torch.no_grad():
+                outputs = self._network(inputs)["features"]
+                _, outputs = self.al_classifier(outputs)
+            predicts = torch.topk(
+                outputs, k=self.topk, dim=1, largest=True, sorted=True
+            )[
+                1
+            ]  # [bs, topk]
+            y_pred.append(predicts.cpu().numpy())
+            y_true.append(targets.cpu().numpy())
 
 
-    #     return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
+        return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
         
     def _eval_cnn(self, loader):
         self._network.eval()

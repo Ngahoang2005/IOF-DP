@@ -4,7 +4,7 @@
   "memory_size": 0,
   "fixed_memory": false,
   "shuffle": true,
-  "cosine": false,
+  "cosine": true,
   "init_cls": 10,
   "increment": 10,
   "model_name": "lwf",
