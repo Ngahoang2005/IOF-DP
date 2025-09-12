@@ -14,7 +14,7 @@
   "seed": [1993],
   "resume": false,
   "model_dir": "save_model/cifar100/dpcr_cifar_10_seed_1993/",
-  "DPCR": false,
+  "DPCR": true,
   "rg": 200,
   "rg_tssp": 1e-9
 }
