@@ -101,18 +101,18 @@ class BaseLearner(object):
         else:
             return (self._data_memory, self._targets_memory)
 
-    # def _compute_accuracy(self, model, loader):
-    #     model.eval()
-    #     correct, total = 0, 0
-    #     for i, (_, inputs, targets) in enumerate(loader):
-    #         inputs = inputs.to(self._device)
-    #         with torch.no_grad():
-    #             outputs = model(inputs)["logits"]
-    #         predicts = torch.max(outputs, dim=1)[1]
-    #         correct += (predicts.cpu() == targets).sum()
-    #         total += len(targets)
+    def _compute_accuracy(self, model, loader):
+        model.eval()
+        correct, total = 0, 0
+        for i, (_, inputs, targets) in enumerate(loader):
+            inputs = inputs.to(self._device)
+            with torch.no_grad():
+                outputs = model(inputs)["logits"]
+            predicts = torch.max(outputs, dim=1)[1]
+            correct += (predicts.cpu() == targets).sum()
+            total += len(targets)
 
-    #     return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
+        return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
     def _eval_cnn(self, loader):
         self._network.eval()
@@ -133,24 +133,7 @@ class BaseLearner(object):
 
 
         return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
-        
-    def _eval_cnn(self, loader):
-        self._network.eval()
-        y_pred, y_true = [], []
-        for _, (_, inputs, targets) in enumerate(loader):
-            inputs = inputs.to(self._device)
-            with torch.no_grad():
-                outputs = self._network(inputs)["logits"]
-            predicts = torch.topk(
-                outputs, k=self.topk, dim=1, largest=True, sorted=True
-            )[
-                1
-            ]  # [bs, topk]
-            y_pred.append(predicts.cpu().numpy())
-            y_true.append(targets.cpu().numpy())
-
-        return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
-
+  
     def _extract_vectors_adv(self, loader, old=False):
         self._network.eval()
         if old:
