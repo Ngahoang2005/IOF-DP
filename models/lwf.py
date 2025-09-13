@@ -444,7 +444,7 @@ class LwF(BaseLearner):
     #         prog_bar.set_description(info)
     #     logging.info(info)
 
-def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
+    def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
             self._network.train()
