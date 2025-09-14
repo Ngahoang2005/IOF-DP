@@ -23,7 +23,7 @@ init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 250
+epochs = 100
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.6)
+            threshold = torch.quantile(score, self.quantile)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
@@ -325,7 +325,7 @@ class LwF(BaseLearner):
         logging.info(info)
 
 
-    def update_parameters_with_task_vectors(self, theta_t, delta_in, delta_out):
+    def update_parameters_with_task_vectors(self, theta_t, delta_in, delta_out, _cur_task):
         
         inner_mask = self.ipt_score.calculate_score_inner(metric="ipt")
         outer_mask = self.ipt_score.calculate_score_outer(metric="ipt")
@@ -336,8 +336,8 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] = 0.3
-            outer[both_one] = 0.7
+            outer[both_one] = _cur_task / (_cur_task + 1)
+            inner[both_one] =  1 - outer[both_one]
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.5
             outer[both_zero] = 0.5
@@ -493,7 +493,7 @@ class LwF(BaseLearner):
                     self._old_network(inputs)["logits"],
                     T,
                     )
-                    loss = 20*loss_kd + loss_clf
+                    loss = loss_kd 
                     optimizer.zero_grad()
                     loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
@@ -506,7 +506,7 @@ class LwF(BaseLearner):
                         total += len(targets)
                 theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
-                self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out) 
+                self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
             # ---- epoch end ----
             scheduler.step()
             train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
