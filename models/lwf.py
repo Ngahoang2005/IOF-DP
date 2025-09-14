@@ -23,7 +23,7 @@ init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 125
+epochs = 100
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -336,8 +336,8 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            outer[both_one] = _cur_task / (_cur_task + 1)
-            inner[both_one] =  1 - outer[both_one]
+            outer[both_one] = 0.6
+            inner[both_one] =  0.4
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.5
             outer[both_zero] = 0.5
