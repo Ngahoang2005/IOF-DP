@@ -336,8 +336,8 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            outer[both_one] = 0.6
-            inner[both_one] =  0.4
+            outer[both_one] = _cur_task/(self._cur_task + 1)
+            inner[both_one] =  1 - outer[both_one]
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.5
             outer[both_zero] = 0.5
