@@ -505,7 +505,7 @@ class LwF(BaseLearner):
                         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
                         total += len(targets)
                 theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
+                delta_out = {n: theta_after_outer[n] - theta_t[n] for n in theta_t}
                 self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
             # ---- epoch end ----
             scheduler.step()
