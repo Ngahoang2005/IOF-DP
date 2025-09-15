@@ -447,7 +447,7 @@ class LwF(BaseLearner):
 
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
         prog_bar = tqdm(range(epochs))
-        for _, epoch in prog_bar:
+        for epoch in prog_bar:
             self._network.train()
             losses_inner = 0.0
             losses_outer = 0.0
