@@ -16,15 +16,15 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 10
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 10 
-lrate = 0.05
+epochs = 125
+lrate = 0.0625
 milestones = [45, 90]
 lrate_decay = 0.1
 batch_size = 128
@@ -371,8 +371,7 @@ class LwF(BaseLearner):
             data_iter = iter(train_loader)
 
             for cycle in range(39):  # 32 chu kỳ
-                self.ipt_score.empty_inner_score()
-                self.ipt_score.empty_outer_score()
+            
                 # === 4 bước INNER ===
                 try:
                     _, inputs, targets = next(data_iter)
@@ -404,10 +403,6 @@ class LwF(BaseLearner):
                     total += targets.size(0)
                 theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
-                with torch.no_grad():
-                    for n, p in self._network.named_parameters():
-                        if n in theta_t:
-                            p.copy_(theta_t[n])
                 # === 1 bước OUTER ===
                 for _ in range(1): 
                     logits = self._network(inputs)["logits"]
@@ -431,8 +426,10 @@ class LwF(BaseLearner):
                         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
                         total += len(targets)
                 theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                delta_out = {n: theta_after_outer[n] - theta_t[n] for n in theta_t}
+                delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                 self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
+                self.ipt_score.empty_inner_score()
+                self.ipt_score.empty_outer_score()
             # ---- epoch end ----
             scheduler.step()
             train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
