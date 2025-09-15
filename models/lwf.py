@@ -336,11 +336,11 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            outer[both_one] = 0.6
-            inner[both_one] =  0.4
-            both_zero = (inner == 0) & (outer == 0)
-            inner[both_zero] = 0.5
-            outer[both_zero] = 0.5
+            outer[both_one] = 1
+            inner[both_one] =  0.8
+            # both_zero = (inner == 0) & (outer == 0)
+            # inner[both_zero] = 0.5
+            # outer[both_zero] = 0.5
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
@@ -500,7 +500,7 @@ class LwF(BaseLearner):
                     self._old_network(inputs)["logits"],
                     T,
                     )
-                    loss = loss_kd 
+                    loss = loss_kd  
                     optimizer.zero_grad()
                     loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
