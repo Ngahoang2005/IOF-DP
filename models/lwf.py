@@ -336,8 +336,8 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            outer[both_one] = 0.4
-            inner[both_one] =  0.6
+            outer[both_one] = 0.6
+            inner[both_one] =  0.4
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.5
             outer[both_zero] = 0.5
@@ -472,12 +472,12 @@ class LwF(BaseLearner):
                     fake_targets = targets - self._known_classes
                     loss_inner = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
                     #test thử loss kd
-                    logits = self._network(inputs)["logits"]
-                    loss_inner = _KD_loss(
-                    logits[:, : self._known_classes],
-                    self._old_network(inputs)["logits"],
-                    T,
-                    )
+                    # logits = self._network(inputs)["logits"]
+                    # loss_inner = _KD_loss(
+                    # logits[:, : self._known_classes],
+                    # self._old_network(inputs)["logits"],
+                    # T,
+                    # )
                     optimizer.zero_grad()
                     loss_inner.backward()
                     self.ipt_score.update_inner_score(self._network, epoch)
@@ -500,7 +500,7 @@ class LwF(BaseLearner):
                     self._old_network(inputs)["logits"],
                     T,
                     )
-                    loss = loss_clf 
+                    loss = loss_kd 
                     optimizer.zero_grad()
                     loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
