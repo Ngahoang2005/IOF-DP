@@ -388,6 +388,7 @@ class LwF(BaseLearner):
                     fake_targets = targets - self._known_classes
                     loss_inner = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
                     #test thử loss kd
+                    logits = self._network(inputs)["logits"]
                     loss_inner = _KD_loss(
                     logits[:, : self._known_classes],
                     self._old_network(inputs)["logits"],
