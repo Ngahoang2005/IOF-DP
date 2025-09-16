@@ -338,8 +338,8 @@ class LwF(BaseLearner):
             outer[both_one] = 0.9
             inner[both_one] =  0.1
             both_zero = (inner == 0) & (outer == 0)
-            inner[both_zero] = 0.9
-            outer[both_zero] = 0.1
+            inner[both_zero] = 0.1
+            outer[both_zero] = 0.9
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
@@ -455,8 +455,6 @@ class LwF(BaseLearner):
             data_iter = iter(train_loader)
 
             for cycle in range(39):  # 32 chu kỳ
-            
-                # === 4 bước INNER ===
                 try:
                     _, inputs, targets = next(data_iter)
                 except StopIteration:
