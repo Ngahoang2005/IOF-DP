@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 200
+init_epoch = 20
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 20
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -329,15 +329,39 @@ class LwF(BaseLearner):
         
         inner_mask = self.ipt_score.calculate_score_inner(metric="ipt")
         outer_mask = self.ipt_score.calculate_score_outer(metric="ipt")
-        
+        with torch.no_grad():
+            total_params = 0
+            inner_0 = inner_1 = 0
+            outer_0 = outer_1 = 0
+            both_0 = both_1 = 0
+
+            for n in inner.keys():
+                i_mask = inner[n]
+                o_mask = outer[n]
+
+                total_params += i_mask.numel()
+                inner_0 += (i_mask == 0).sum().item()
+                inner_1 += (i_mask == 1).sum().item()
+                outer_0 += (o_mask == 0).sum().item()
+                outer_1 += (o_mask == 1).sum().item()
+                both_0  += ((i_mask == 0) & (o_mask == 0)).sum().item()
+                both_1  += ((i_mask == 1) & (o_mask == 1)).sum().item()
+
+            print("=== Mask statistics ===")
+            print(f"Total parameters : {total_params}")
+            print(f"Inner  : 0 -> {inner_0}, 1 -> {inner_1}")
+            print(f"Outer  : 0 -> {outer_0}, 1 -> {outer_1}")
+            print(f"Both 0 : {both_0}  (inner=0 & outer=0)")
+            print(f"Both 1 : {both_1}  (inner=1 & outer=1)")
+            print("=======================")
         for n in inner_mask:
             inner = inner_mask[n]
             outer = outer_mask[n]
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            outer[both_one] = 0.7
-            inner[both_one] =  0.3
+            outer[both_one] = 0.8
+            inner[both_one] =  0.2
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.7
             outer[both_zero] = 0.3
