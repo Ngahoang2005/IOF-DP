@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 200
+init_epoch = 20
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 10
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.2)
+            threshold = torch.quantile(score, 0.1)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
