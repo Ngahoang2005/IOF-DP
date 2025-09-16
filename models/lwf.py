@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.1)
+            threshold = torch.quantile(score, 0.2)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
