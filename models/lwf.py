@@ -340,6 +340,9 @@ class LwF(BaseLearner):
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.05
             outer[both_zero] = 0.95
+            inner_one = (inner == 1) & (outer == 0)
+            inner[inner_one] = 0.8
+            outer[inner_one] = 0.2
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
