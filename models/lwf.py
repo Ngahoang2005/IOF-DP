@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.4)
+            threshold = torch.quantile(score, 0.2)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
@@ -214,7 +214,6 @@ class IPTScore:
         for n, score in ipt_score_dic_outer.items():
 
             outer_mask[n] = (score > threshold).float()
-           
         return outer_mask
     
     def update_inner_score(self, model, global_step):
@@ -336,11 +335,11 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            outer[both_one] = 0.8
-            inner[both_one] =  0.2
+            outer[both_one] = 0.9
+            inner[both_one] =  0.1
             both_zero = (inner == 0) & (outer == 0)
-            inner[both_zero] = 0.7
-            outer[both_zero] = 0.3
+            inner[both_zero] = 0.9
+            outer[both_zero] = 0.1
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
