@@ -550,7 +550,7 @@ class LwF(BaseLearner):
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
                 
                 theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                if (cycle % 2 == 0):
+                if (cycle % 4 == 0):
                     theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
@@ -570,11 +570,10 @@ class LwF(BaseLearner):
                     _, preds = torch.max(student_outputs, dim=1)
                     correct += preds.eq(targets).cpu().sum().item()
                     total += targets.size(0)
-                theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
+                    theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
+                    delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                 # === 1 bước OUTER ===
-                if (cycle % 2 == 1):
-                    
+                else:
                     logits = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
                     loss_clf = F.cross_entropy(
