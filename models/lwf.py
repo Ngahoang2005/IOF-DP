@@ -551,11 +551,6 @@ class LwF(BaseLearner):
                 
                 #theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                 if (cycle % 4 == 0):
-                    theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                    delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
-                    self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
-                    self.ipt_score.empty_inner_score()
-                    self.ipt_score.empty_outer_score()
                     theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
@@ -599,7 +594,12 @@ class LwF(BaseLearner):
                         _, preds = torch.max(logits, dim=1)
                         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
                         total += len(targets)
-                    
+                if (cycle % 4 == 3):
+                    theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
+                    delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
+                    self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
+                    self.ipt_score.empty_inner_score()
+                    self.ipt_score.empty_outer_score()
                     
                     
             # ---- epoch end ----
