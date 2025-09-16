@@ -335,7 +335,7 @@ class LwF(BaseLearner):
             outer_0 = outer_1 = 0
             both_0 = both_1 = 0
 
-            for n in inner.keys():
+            for n in inner_mask():
                 i_mask = inner[n]
                 o_mask = outer[n]
 
