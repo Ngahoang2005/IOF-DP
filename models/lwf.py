@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 200
+init_epoch = 2
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 2 
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -341,8 +341,8 @@ class LwF(BaseLearner):
             inner[both_zero] = 0.05
             outer[both_zero] = 0.95
             inner_one = (inner == 1) & (outer == 0)
-            inner[inner_one] = 0.1
-            outer[inner_one] = 0.9
+            inner[inner_one] = 0.4
+            outer[inner_one] = 0.6
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
