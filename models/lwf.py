@@ -371,7 +371,7 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
 
-            for cycle in range(40):  # 32 chu kỳ
+            for cycle in range(39):  # 32 chu kỳ
                 try:
                     _, inputs, targets = next(data_iter)
                 except StopIteration:
