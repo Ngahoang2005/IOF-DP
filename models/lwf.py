@@ -567,9 +567,9 @@ class LwF(BaseLearner):
                     self.ipt_score.update_inner_score(self._network, epoch)
                     optimizer.step()
                     losses_inner += loss_inner.item()
-                    _, preds = torch.max(student_outputs, dim=1)
-                    correct += preds.eq(targets).cpu().sum().item()
-                    total += targets.size(0)
+                    # _, preds = torch.max(student_outputs, dim=1)
+                    # correct += preds.eq(targets).cpu().sum().item()
+                    # total += targets.size(0)
                     theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                     
