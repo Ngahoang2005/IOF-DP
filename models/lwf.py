@@ -573,6 +573,7 @@ class LwF(BaseLearner):
                     theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
                     with torch.no_grad():
+                        logits = self._network(inputs)["logits"]
                         _, preds = torch.max(logits, dim=1)
                         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
                         total += len(targets)
@@ -626,6 +627,7 @@ class LwF(BaseLearner):
             prog_bar.set_description(info)
         logging.info(info)
     def after_task(self):
+        print("after_task called")
         self._old_network = self._network.copy().freeze()
         self._known_classes = self._total_classes
         if not self.args['resume']:
