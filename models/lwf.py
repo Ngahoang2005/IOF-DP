@@ -23,7 +23,7 @@ init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 125
+epochs = 100
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -208,7 +208,7 @@ class IPTScore:
             ipt_score_dic_outer[n] = ipt_score
 
         all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
-        threshold = torch.quantile(all_scores, 0.9)
+        threshold = torch.quantile(all_scores, self.quantile)
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
@@ -335,11 +335,11 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] =  0
-            outer[both_one] = 1
+            inner[both_one] =  0.1
+            outer[both_one] = 0.9
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.0
-            outer[both_zero] = 1
+            outer[both_zero] = 0.0
             inner_one = (inner == 1) & (outer == 0)
             inner[inner_one] = 0.1
             outer[inner_one] = 0.9
@@ -371,7 +371,7 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
 
-            for cycle in range(39):  # 32 chu kỳ
+            for cycle in range(40):  # 32 chu kỳ
                 try:
                     _, inputs, targets = next(data_iter)
                 except StopIteration:
@@ -381,7 +381,7 @@ class LwF(BaseLearner):
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
                 
                 #theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                if (cycle % 3 == 0):
+                if (cycle % 4 == 0):
                     theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
@@ -413,7 +413,7 @@ class LwF(BaseLearner):
                     optimizer.step()
                     losses_outer += loss.item()
                 
-                if (cycle % 3 == 2):
+                if (cycle % 4 == 3):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                     self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
