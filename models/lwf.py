@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 200
+init_epoch = 20
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 20
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -602,6 +602,8 @@ class LwF(BaseLearner):
                         _, preds = torch.max(logits, dim=1)
                         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
                         total += len(targets)
+                    train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
+                    print(train_acc)
                     
             # ---- epoch end ----
             scheduler.step()
