@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.1)
+            threshold = torch.quantile(score, 0.025)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
@@ -335,12 +335,12 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] =  0.1
-            outer[both_one] = 0.9
+            inner[both_one] =  0.0
+            outer[both_one] = 1.0
 
             inner_one = (inner == 1) & (outer == 0)
-            inner[inner_one] = 0.1
-            outer[inner_one] = 0.9
+            inner[inner_one] = 1
+            outer[inner_one] = 0.0
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
@@ -379,7 +379,7 @@ class LwF(BaseLearner):
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
                 
                 #theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                if (cycle % 5 == 0):
+                if (cycle % 4 == 0):
                     theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
@@ -411,7 +411,7 @@ class LwF(BaseLearner):
                     optimizer.step()
                     losses_outer += loss.item()
                 
-                if (cycle % 5 == 4):
+                if (cycle % 4 == 3):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                     self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
