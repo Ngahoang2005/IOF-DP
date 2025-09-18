@@ -591,17 +591,17 @@ class LwF(BaseLearner):
                     self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
                     losses_outer += loss.item()
-                    with torch.no_grad():
-                        _, preds = torch.max(logits, dim=1)
-                        correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-                        total += len(targets)
+                    
                 if (cycle % 3 == 2):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                     self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
                     self.ipt_score.empty_inner_score()
                     self.ipt_score.empty_outer_score()
-                    
+                    with torch.no_grad():
+                        _, preds = torch.max(logits, dim=1)
+                        correct += preds.eq(targets.expand_as(preds)).cpu().sum()
+                        total += len(targets)
                     
             # ---- epoch end ----
             scheduler.step()
