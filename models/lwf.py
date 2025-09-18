@@ -337,9 +337,7 @@ class LwF(BaseLearner):
             both_one = (inner == 1) & (outer == 1)
             inner[both_one] =  0.1
             outer[both_one] = 0.9
-            both_zero = (inner == 0) & (outer == 0)
-            inner[both_zero] = 0.0
-            outer[both_zero] = 0.0
+
             inner_one = (inner == 1) & (outer == 0)
             inner[inner_one] = 0.1
             outer[inner_one] = 0.9
@@ -381,7 +379,7 @@ class LwF(BaseLearner):
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
                 
                 #theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                if (cycle % 4 == 0):
+                if (cycle % 5 == 0):
                     theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
@@ -413,7 +411,7 @@ class LwF(BaseLearner):
                     optimizer.step()
                     losses_outer += loss.item()
                 
-                if (cycle % 4 == 3):
+                if (cycle % 5 == 4):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                     self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
