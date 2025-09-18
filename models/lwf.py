@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 2
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 1
+epochs = 125
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -520,6 +520,14 @@ class LwF(BaseLearner):
     #         )
     #         prog_bar.set_description(info)
     #     logging.info(info)
+    def after_task(self):
+        print("after_task called")
+        self._old_network = self._network.copy().freeze()
+        self._known_classes = self._total_classes
+        if not self.args['resume']:
+            if not os.path.exists(self.args["model_dir"]):
+                os.makedirs(self.args["model_dir"])
+            self.save_checkpoint("{}".format(self.args["model_dir"]))
         
 
     def incremental_train(self, data_manager):
