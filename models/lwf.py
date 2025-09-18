@@ -572,6 +572,9 @@ class LwF(BaseLearner):
                     # total += targets.size(0)
                     theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
+                    train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
+                    print(train_acc)
+                    
                     
                 # === 1 bước OUTER ===
                 else:
@@ -591,6 +594,8 @@ class LwF(BaseLearner):
                     self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
                     losses_outer += loss.item()
+                    train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
+                    print(train_acc)
                     
                 if (cycle % 3 == 2):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
