@@ -203,7 +203,7 @@ class IPTScore:
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
-            threshold = torch.quantile(score, 0.2)
+            threshold = torch.quantile(score, 0.1)
             outer_mask[n] = (score > threshold).float()
  
         return outer_mask
@@ -227,7 +227,7 @@ class IPTScore:
             ipt_score_dic_outer[n] = ipt_score
 
         all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
-        threshold = torch.quantile(all_scores, 0.2)
+        threshold = torch.quantile(all_scores, 0.1)
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
@@ -358,8 +358,8 @@ class LwF(BaseLearner):
             outer[both_one] = 1.0
 
             inner_one = (inner == 1) & (outer == 0)
-            inner[inner_one] = 0.1
-            outer[inner_one] = 0.9
+            inner[inner_one] = 1.0
+            outer[inner_one] = 0.0
         
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
