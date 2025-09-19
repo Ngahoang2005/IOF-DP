@@ -341,6 +341,9 @@ class LwF(BaseLearner):
             inner_one = (inner == 1) & (outer == 0)
             inner[inner_one] = 1
             outer[inner_one] = 0.0
+            both_zero = (inner == 0) & (outer == 0)
+            inner[both_zero] = 1.0
+            outer[both_zero] = 1.0
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
@@ -734,3 +737,4 @@ def _KD_loss(pred, soft, T):
     pred = torch.log_softmax(pred / T, dim=1)
     soft = torch.softmax(soft / T, dim=1)
     return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
+0
