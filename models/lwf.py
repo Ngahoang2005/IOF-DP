@@ -23,8 +23,8 @@ init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 120
-lrate = 0.05
+epochs = 150
+lrate = 0.0625
 milestones = [40, 80, 100]
 lrate_decay = 0.1
 batch_size = 128
@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.9)
+            threshold = torch.quantile(score, 0.8)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
@@ -178,7 +178,7 @@ class IPTScore:
         # 1) Gom tất cả score
         all_scores = torch.cat([s.flatten() for s in ipt_score_dic_inner.values()])
         # 2) Cắt theo quantile chung, ví dụ 0.8 ⇒ giữ top 20%
-        thr = torch.quantile(all_scores, 0.9)
+        thr = torch.quantile(all_scores, 0.8)
 
         # 3) Tạo mask cho từng tensor bằng ngưỡng chung
         inner_mask = {n: (s > thr).float() for n, s in ipt_score_dic_inner.items()}
@@ -354,12 +354,13 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] =  0.0
-            outer[both_one] = 1.0
+            inner[both_one] =  0.1
+            outer[both_one] = 0.9
 
             inner_one = (inner == 1) & (outer == 0)
             inner[inner_one] = 1.0
             outer[inner_one] = 0.0
+            
         
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
