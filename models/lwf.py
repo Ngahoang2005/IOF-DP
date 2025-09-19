@@ -178,7 +178,7 @@ class IPTScore:
         # 1) Gom tất cả score
         all_scores = torch.cat([s.flatten() for s in ipt_score_dic_inner.values()])
         # 2) Cắt theo quantile chung, ví dụ 0.8 ⇒ giữ top 20%
-        thr = torch.quantile(all_scores, 0.9)
+        thr = torch.quantile(all_scores, 0.95)
 
         # 3) Tạo mask cho từng tensor bằng ngưỡng chung
         inner_mask = {n: (s > thr).float() for n, s in ipt_score_dic_inner.items()}
