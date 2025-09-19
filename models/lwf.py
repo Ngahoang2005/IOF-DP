@@ -380,10 +380,11 @@ class LwF(BaseLearner):
                     p.copy_(theta_t[n] + final_delta[n])
 
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
-        self.ipt_score.empty_inner_score()
-        self.ipt_score.empty_outer_score()
+        
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
+            self.ipt_score.empty_inner_score()
+            self.ipt_score.empty_outer_score()
             self._network.train()
             losses_inner = 0.0
             losses_outer = 0.0
