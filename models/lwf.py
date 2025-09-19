@@ -691,7 +691,11 @@ class LwF(BaseLearner):
                 self._protos.append(torch.tensor(class_mean).to(self._device))
                 self._covs.append(torch.tensor(cov).to(self._device))
                 self._projectors.append(self.get_projector_svd(self._covs[class_idx]))
+# def _KD_loss(pred, soft, T):
+#     pred = torch.log_softmax(pred / T, dim=1)
+#     soft = torch.softmax(soft / T, dim=1)
+#     return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
 def _KD_loss(pred, soft, T):
-    pred = torch.log_softmax(pred / T, dim=1)
-    soft = torch.softmax(soft / T, dim=1)
-    return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
+    pred_log = torch.log_softmax(pred / T, dim=1)
+    soft_prob = torch.softmax(soft / T, dim=1)
+    return F.kl_div(pred_log, soft_prob, reduction="batchmean") * (T * T)
