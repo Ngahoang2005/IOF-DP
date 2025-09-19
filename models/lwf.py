@@ -380,19 +380,19 @@ class LwF(BaseLearner):
                     p.copy_(theta_t[n] + final_delta[n])
 
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
-        
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
-            self.ipt_score.empty_inner_score()
-            self.ipt_score.empty_outer_score()
             self._network.train()
-            losses_inner = 0.0
-            losses_outer = 0.0
-            correct, total = 0, 0
+
+            # ----- reset thống kê cho epoch -----
+            losses_inner_sum = 0.0
+            losses_outer_sum = 0.0
+            inner_steps = 0
+            outer_steps = 0
 
             data_iter = iter(train_loader)
 
-            for cycle in range(40):  # 32 chu kỳ
+            for cycle in range(39):  # ví dụ block 1:2 (I, O, O) -> 3n; bạn đang dùng 40, vẫn ok
                 try:
                     _, inputs, targets = next(data_iter)
                 except StopIteration:
@@ -400,64 +400,84 @@ class LwF(BaseLearner):
                     _, inputs, targets = next(data_iter)
 
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
-                
-                #theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
-                if (cycle % 3 == 0) :  # inner loop
+
+                if (cycle % 3 == 0):  # ===== INNER step =====
                     theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
+
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
                     loss_inner = F.cross_entropy(student_outputs[:, self._known_classes:], fake_targets)
+
                     optimizer.zero_grad()
                     loss_inner.backward()
                     self.ipt_score.update_inner_score(self._network, epoch)
                     optimizer.step()
-                    losses_inner += loss_inner.item()
-                   
+
+                    losses_inner_sum += float(loss_inner.item())
+                    inner_steps += 1
+
                     theta_after_inner = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_in = {n: theta_after_inner[n] - theta_t[n] for n in theta_t}
 
-                else:
+                else:               # ===== OUTER step =====
                     logits = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
-                    loss_clf = F.cross_entropy(
-                    logits[:, self._known_classes :], fake_targets
-                    )
+
+                    # Bạn đang chỉ dùng KD cho outer; giữ nguyên như code gốc
                     loss_kd = _KD_loss(
-                    logits[:, : self._known_classes],
-                    self._old_network(inputs)["logits"],
-                    T,
+                        logits[:, : self._known_classes],
+                        self._old_network(inputs)["logits"],
+                        T,
                     )
-                    loss = loss_kd  
+                    loss = loss_kd
+
                     optimizer.zero_grad()
                     loss.backward()
                     self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
-                    losses_outer += loss.item()
-                
+
+                    losses_outer_sum += float(loss.item())
+                    outer_steps += 1
+
+                # ===== Kết block: trộn tham số sau mỗi 3 cycle =====
                 if (cycle % 3 == 2):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
-                    self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
-                    
-                    with torch.no_grad():
-                        _, preds = torch.max(logits, dim=1)
-                        correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-                        total += len(targets)
-                    
-            # ---- epoch end ----
+                    self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task)
+
+            # ---- END TRAINING OF EPOCH ----
             scheduler.step()
-            train_acc = np.around(tensor2numpy(torch.tensor(correct)) * 100 / total, decimals=2)
+
+            # ===== ĐO TRAIN_ACC CHUẨN TRÊN TOÀN TRAIN SET =====
+            self._network.eval()
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for _, inputs_eval, targets_eval in train_loader:
+                    inputs_eval, targets_eval = inputs_eval.to(self._device), targets_eval.to(self._device)
+                    logits_eval = self._network(inputs_eval)["logits"]
+                    _, preds = torch.max(logits_eval, dim=1)
+                    correct += preds.eq(targets_eval).sum().item()
+                    total += targets_eval.size(0)
+            train_acc = round(100.0 * correct / max(total, 1), 2)
+            self._network.train()
+
+            # ===== ĐO TEST_ACC =====
             test_acc = self._compute_accuracy(self._network, test_loader)
-            info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-                self._cur_task,
-                epoch + 1,
-                epochs,
-                losses_inner / len(train_loader),
-                train_acc,
-                test_acc,
+
+            # ===== TÍNH AVERAGE LOSS CHUẨN =====
+            avg_inner = losses_inner_sum / max(inner_steps, 1)
+            avg_outer = losses_outer_sum / max(outer_steps, 1)
+
+            info = (
+                f"Task {self._cur_task}, Epoch {epoch+1}/{epochs} "
+                f"=> InnerLoss {avg_inner:.3f}, OuterLoss {avg_outer:.3f}, "
+                f"Train_accy {train_acc:.2f}, Test_accy {test_acc:.2f}"
             )
             prog_bar.set_description(info)
+
         logging.info(info)
+
     
     def after_task(self):
         print("after_task called")
