@@ -380,6 +380,8 @@ class LwF(BaseLearner):
                     p.copy_(theta_t[n] + final_delta[n])
 
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
+        self.ipt_score.empty_inner_score()
+        self.ipt_score.empty_outer_score()
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
             self._network.train()
@@ -435,8 +437,7 @@ class LwF(BaseLearner):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                     self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task) 
-                    self.ipt_score.empty_inner_score()
-                    self.ipt_score.empty_outer_score()
+                    
                     with torch.no_grad():
                         _, preds = torch.max(logits, dim=1)
                         correct += preds.eq(targets.expand_as(preds)).cpu().sum()
