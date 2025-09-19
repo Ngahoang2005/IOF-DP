@@ -383,6 +383,8 @@ class LwF(BaseLearner):
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
+            self.ipt_score.empty_inner_score()
+            self.ipt_score.empty_outer_score()
             self._network.train()
 
             # ----- reset thống kê cho epoch -----
