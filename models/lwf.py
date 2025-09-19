@@ -139,7 +139,7 @@ class IPTScore:
                     # Update uncertainty 
                     self.exp_avg_unc_inner[n] = self.beta2 * self.exp_avg_unc_inner[n] + (1-self.beta2)*(self.ipt_inner[n]-self.exp_avg_ipt_inner[n]).abs()
     
-    def calculate_score_inner(self, p=None, metric="ipt"):
+    def calculate_score_inner_local(self, p=None, metric="ipt"):
         assert len(self.exp_avg_ipt_inner) == len(self.exp_avg_unc_inner)
     
         ipt_score_dic_inner = {}
@@ -159,15 +159,34 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.7)
+            threshold = torch.quantile(score, 0.9)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
         return inner_mask
+    def calculate_score_inner(self, p=None, metric="ipt"):
+        ipt_score_dic_inner = {}
+        for n in self.exp_avg_ipt_inner:
+            if metric == "ipt":
+                ipt = self.exp_avg_ipt_inner[n] * self.exp_avg_unc_inner[n]
+            elif metric == "mag":
+                ipt = p.abs().detach().clone()
+            else:
+                raise ValueError(...)
+            ipt_score_dic_inner[n] = ipt
+
+        # 1) Gom tất cả score
+        all_scores = torch.cat([s.flatten() for s in ipt_score_dic_inner.values()])
+        # 2) Cắt theo quantile chung, ví dụ 0.8 ⇒ giữ top 20%
+        thr = torch.quantile(all_scores, 0.9)
+
+        # 3) Tạo mask cho từng tensor bằng ngưỡng chung
+        inner_mask = {n: (s > thr).float() for n, s in ipt_score_dic_inner.items()}
+        return inner_mask
+
 
     def calculate_score_outer_local(self, p=None, metric="ipt"):
         assert len(self.exp_avg_ipt_outer) == len(self.exp_avg_unc_outer)
-        
         
         ipt_score_dic_outer = {}
         for n in self.exp_avg_ipt_outer:
@@ -184,7 +203,7 @@ class IPTScore:
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
-            threshold = torch.quantile(score, 0.7)
+            threshold = torch.quantile(score, 0.2)
             outer_mask[n] = (score > threshold).float()
  
         return outer_mask
@@ -208,7 +227,7 @@ class IPTScore:
             ipt_score_dic_outer[n] = ipt_score
 
         all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
-        threshold = torch.quantile(all_scores, 0.1)
+        threshold = torch.quantile(all_scores, 0.2)
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
