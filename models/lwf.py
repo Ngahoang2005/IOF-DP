@@ -203,7 +203,7 @@ class IPTScore:
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
-            threshold = torch.quantile(score, 0.2)
+            threshold = torch.quantile(score, 0.4)
             outer_mask[n] = (score > threshold).float()
  
         return outer_mask
@@ -227,7 +227,7 @@ class IPTScore:
             ipt_score_dic_outer[n] = ipt_score
 
         all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
-        threshold = torch.quantile(all_scores, 0.2)
+        threshold = torch.quantile(all_scores, 0.4)
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
@@ -354,8 +354,8 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] =  0.1
-            outer[both_one] = 0.9
+            inner[both_one] =  0.3
+            outer[both_one] = 0.7
 
             inner_one = (inner == 1) & (outer == 0)
             inner[inner_one] = 1.0
