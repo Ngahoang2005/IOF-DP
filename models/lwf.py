@@ -227,7 +227,7 @@ class IPTScore:
             ipt_score_dic_outer[n] = ipt_score
 
         all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
-        threshold = torch.quantile(all_scores, self.quantile)
+        threshold = torch.quantile(all_scores, 0.2)
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
