@@ -354,8 +354,8 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] =  0.5
-            outer[both_one] = 0.5
+            inner[both_one] =  0.1
+            outer[both_one] = 0.9
         
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
@@ -376,12 +376,11 @@ class LwF(BaseLearner):
                     p.copy_(theta_t[n] + final_delta[n])
 
     def _update_representation(self, train_loader, test_loader, optimizer, scheduler): 
+        self.ipt_score.empty_inner_score()
+        self.ipt_score.empty_outer_score()
         prog_bar = tqdm(range(epochs))
         for epoch in prog_bar:
-            self.ipt_score.empty_inner_score()
-            self.ipt_score.empty_outer_score()
             self._network.train()
-
             # ----- reset thống kê cho epoch -----
             losses_inner_sum = 0.0
             losses_outer_sum = 0.0
@@ -390,7 +389,7 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
 
-            for cycle in range(40):  # ví dụ block 1:2 (I, O, O) -> 3n; bạn đang dùng 40, vẫn ok
+            for cycle in range(39):  # ví dụ block 1:2 (I, O, O) -> 3n; bạn đang dùng 40, vẫn ok
                 try:
                     _, inputs, targets = next(data_iter)
                 except StopIteration:
@@ -399,7 +398,7 @@ class LwF(BaseLearner):
 
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
 
-                if (cycle % 2 == 0):  # ===== INNER step =====
+                if (cycle % 3 == 0):  # ===== INNER step =====
                     theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
 
                     student_outputs = self._network(inputs)["logits"]
@@ -438,7 +437,7 @@ class LwF(BaseLearner):
                     outer_steps += 1
 
                 # ===== Kết block: trộn tham số sau mỗi 3 cycle =====
-                if (cycle % 2 == 1):
+                if (cycle % 3 == 2):
                     theta_after_outer = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
                     delta_out = {n: theta_after_outer[n] - theta_after_inner[n] for n in theta_t}
                     self.update_parameters_with_task_vectors(theta_t, delta_in, delta_out, self._cur_task)
