@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.9)
+            threshold = torch.quantile(score, self.quantile)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
@@ -178,7 +178,7 @@ class IPTScore:
         # 1) Gom tất cả score
         all_scores = torch.cat([s.flatten() for s in ipt_score_dic_inner.values()])
         # 2) Cắt theo quantile chung, ví dụ 0.8 ⇒ giữ top 20%
-        thr = torch.quantile(all_scores, 0.9)
+        thr = torch.quantile(all_scores,self.quantile)
 
         # 3) Tạo mask cho từng tensor bằng ngưỡng chung
         inner_mask = {n: (s > thr).float() for n, s in ipt_score_dic_inner.items()}
@@ -203,7 +203,7 @@ class IPTScore:
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
-            threshold = torch.quantile(score, 0.4)
+            threshold = torch.quantile(score, self.quantile)
             outer_mask[n] = (score > threshold).float()
  
         return outer_mask
@@ -227,7 +227,7 @@ class IPTScore:
             ipt_score_dic_outer[n] = ipt_score
 
         all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
-        threshold = torch.quantile(all_scores, 0.4)
+        threshold = torch.quantile(all_scores, self.quantile)
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
@@ -356,11 +356,6 @@ class LwF(BaseLearner):
             both_one = (inner == 1) & (outer == 1)
             inner[both_one] =  0.3
             outer[both_one] = 0.7
-
-            inner_one = (inner == 1) & (outer == 0)
-            inner[inner_one] = 1.0
-            outer[inner_one] = 0.0
-            
         
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
