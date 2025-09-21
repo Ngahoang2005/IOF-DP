@@ -1601,26 +1601,26 @@ init_weight_decay = 0.0005
 # lamda = 10
 
 # Tiny-ImageNet200
-# epochs = 100
-# lrate = 0.001
-# milestones = [45, 90]
-# lrate_decay = 0.1
-# batch_size = 128
-# weight_decay = 2e-4
-# num_workers = 8
-# T = 2
-# lamda = 10
-
-#imagenet100
-epochs = 1
-lrate = 0.05
+epochs = 100
+lrate = 0.001
 milestones = [45, 90]
 lrate_decay = 0.1
 batch_size = 128
 weight_decay = 2e-4
 num_workers = 8
 T = 2
-lamda = 5
+lamda = 10
+
+# #imagenet100
+# epochs = 1
+# lrate = 0.05
+# milestones = [45, 90]
+# lrate_decay = 0.1
+# batch_size = 128
+# weight_decay = 2e-4
+# num_workers = 8
+# T = 2
+# lamda = 5
 
 
 # fine-grained dataset
