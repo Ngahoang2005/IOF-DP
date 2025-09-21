@@ -16,5 +16,5 @@
   "model_dir": "save_model/tiny-imagenet/resnet18/dpcr_tiny_10_seed_1993/",
   "DPCR": true,
   "rg": 2000,
-  "rg_gdc": 1e-9
+  "rg_tssp": 1e-9
 }
