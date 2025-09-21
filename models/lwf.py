@@ -251,9 +251,9 @@ class LwF(BaseLearner):
             lamda = 5
             self.num_per_class = 1300
         elif self.args["dataset"] == "tinyimagenet200":
-            epochs = 100
+            epochs = 40
             lrate = 0.001
-            milestones = [45, 90]
+            milestones = [39]
             lrate_decay = 0.1
             batch_size = 128
             weight_decay = 2e-4
