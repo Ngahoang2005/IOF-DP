@@ -16,26 +16,15 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 5
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 5 
-lrate = 0.05
-milestones = [45, 90]
-lrate_decay = 0.1
-batch_size = 128
-weight_decay = 2e-4
-num_workers = 8
-T = 2
-lamda = 10
-
-# Tiny-ImageNet200
-# epochs = 100
-# lrate = 0.001
+# epochs = 5 
+# lrate = 0.05
 # milestones = [45, 90]
 # lrate_decay = 0.1
 # batch_size = 128
@@ -43,6 +32,17 @@ lamda = 10
 # num_workers = 8
 # T = 2
 # lamda = 10
+
+# Tiny-ImageNet200
+epochs = 40
+lrate = 0.001
+milestones = [39]
+lrate_decay = 0.1
+batch_size = 128
+weight_decay = 2e-4
+num_workers = 8
+T = 2
+lamda = 10
 
 # imagenet100
 # epochs = 100
