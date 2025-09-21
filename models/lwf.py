@@ -1,6 +1,3 @@
-
-
-
 import logging
 import numpy as np
 import torch
@@ -16,7 +13,7 @@ from utils.inc_net import IncrementalNet, CosineIncrementalNet, Drift_Estimator,
 from models.base import BaseLearner
 from utils.toolkit import target2onehot, tensor2numpy
 from torchvision import datasets, transforms
-from utils.autoaugment import CIFAR10Policy, ImageNetPolicy, TinyImageNetPolicy
+from utils.autoaugment import CIFAR10Policy
 
 
 init_epoch = 200
@@ -26,9 +23,9 @@ init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 100
+epochs = 60
 lrate = 0.05
-milestones = [45, 90]
+milestones = [20, 40]
 lrate_decay = 0.1
 batch_size = 128
 weight_decay = 2e-4
