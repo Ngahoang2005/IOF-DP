@@ -3,7 +3,68 @@ import numpy as np
 import os
 from torchvision import datasets, transforms
 from utils.toolkit import split_images_labels, list2dict, text_read
+import os
+import csv
+import shutil
+from pathlib import Path
 
+import torch
+import numpy as np
+from torchvision import datasets, transforms
+from torchvision.datasets.utils import download_and_extract_archive
+
+from utils.toolkit import split_images_labels
+
+
+TINY_IMAGENET_URL = "http://cs231n.stanford.edu/tiny-imagenet-200.zip"
+TINY_IMAGENET_ARCHIVE = "tiny-imagenet-200.zip"
+
+
+def _reorganize_tiny_val_folder(val_dir: str):
+    """
+    Tiny-ImageNet-200/val mặc định có:
+      - val/images/*.JPEG
+      - val/val_annotations.txt (filename, wnid, x1, y1, x2, y2)
+    Hàm này sẽ chuyển ảnh vào cấu trúc:
+      val/<wnid>/images/<filename>.JPEG
+    để dùng được với torchvision.datasets.ImageFolder.
+    """
+    val_dir = Path(val_dir)
+    images_dir = val_dir / "images"
+    anno_file = val_dir / "val_annotations.txt"
+
+    # Nếu đã được tổ chức theo class (đã có thư mục wnid) thì bỏ qua
+    has_class_dirs = any(p.is_dir() and p.name != "images" for p in val_dir.iterdir())
+    if has_class_dirs:
+        return
+
+    # Đọc annotation
+    wnid_map = {}
+    with open(anno_file, "r") as f:
+        reader = csv.reader(f, delimiter="\t")
+        for row in reader:
+            # row: [filename, wnid, x1, y1, x2, y2]
+            if len(row) >= 2:
+                wnid_map[row[0]] = row[1]
+
+    # Tạo thư mục theo wnid và di chuyển ảnh
+    for img_path in images_dir.iterdir():
+        if not img_path.is_file():
+            continue
+        fname = img_path.name
+        wnid = wnid_map.get(fname, None)
+        if wnid is None:
+            # Không có trong annotation → bỏ qua
+            continue
+        target_dir = val_dir / wnid / "images"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(img_path), str(target_dir / fname))
+
+    # Xóa thư mục images rỗng
+    try:
+        images_dir.rmdir()
+    except OSError:
+        pass  # đã trống hoặc còn gì đó thì kệ
 class iData(object):
     train_trsf = []
     test_trsf = []
@@ -141,18 +202,45 @@ class iTinyImageNet200(iData):
     ]
 
     class_order = np.arange(200).tolist()
+    def __init__(self, root="../../data"):
+        self.root = root
+
+    def _ensure_downloaded(self):
+        """
+        Tải và giải nén Tiny-ImageNet-200 nếu chưa có.
+        """
+        data_root = Path(self.root)
+        target_dir = data_root / "tiny-imagenet-200"
+
+        if target_dir.exists():
+            return  # đã có
+
+        data_root.mkdir(parents=True, exist_ok=True)
+        # Dùng util của torchvision để tải + giải nén
+        download_and_extract_archive(
+            url=TINY_IMAGENET_URL,
+            download_root=str(data_root),
+            filename=TINY_IMAGENET_ARCHIVE,
+            extract_root=str(data_root),
+            remove_finished=True,
+        )
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "../../data/tiny-imagenet-200/train/"
-        test_dir = "../../data/tiny-imagenet-200/val/"
+        self._ensure_downloaded()
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        train_dir = os.path.join(self.root, "tiny-imagenet-200", "train")
+        val_dir = os.path.join(self.root, "tiny-imagenet-200", "val")
+
+        # Sắp xếp lại val/ cho phù hợp ImageFolder
+        _reorganize_tiny_val_folder(val_dir)
+
+        # Datasets ở dạng đường dẫn + nhãn để tương thích split_images_labels
+        train_dset = datasets.ImageFolder(train_dir, transform=None)
+        val_dset = datasets.ImageFolder(val_dir, transform=None)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
-        self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
-
+        self.test_data, self.test_targets = split_images_labels(val_dset.imgs)
 
 class iCUB200(iData):
     use_path = True
