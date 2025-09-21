@@ -36,7 +36,7 @@ init_weight_decay = 0.0005
 # Tiny-ImageNet200
 epochs = 100
 lrate = 0.001
-milestones = [39]
+milestones = [45, 90]
 lrate_decay = 0.1
 batch_size = 128
 weight_decay = 2e-4
@@ -251,9 +251,9 @@ class LwF(BaseLearner):
             lamda = 5
             self.num_per_class = 1300
         elif self.args["dataset"] == "tinyimagenet200":
-            epochs = 40
+            epochs = 100
             lrate = 0.001
-            milestones = [39]
+            milestones = [45, 90]
             lrate_decay = 0.1
             batch_size = 128
             weight_decay = 2e-4
@@ -453,8 +453,8 @@ class LwF(BaseLearner):
             correct, total = 0, 0
 
             data_iter = iter(train_loader)
-            #for _, cycle in enumerate(prog_bar):
-            for cycle in range(94):  # 32 chu kỳ
+            for _, cycle in enumerate(prog_bar):
+            #for cycle in range(94):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 try:
                     _, inputs, targets = next(data_iter)
