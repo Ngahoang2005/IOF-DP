@@ -782,9 +782,9 @@ init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 60
+epochs = 100
 lrate = 0.05
-milestones = [20, 40]
+milestones = [45, 90]
 lrate_decay = 0.1
 batch_size = 128
 weight_decay = 2e-4
