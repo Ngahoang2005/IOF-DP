@@ -453,7 +453,7 @@ class LwF(BaseLearner):
             correct, total = 0, 0
 
             data_iter = iter(train_loader)
-            for _, epoch in enumerate(prog_bar):
+            for _, epoch in enumerate(train_loader):
             #for cycle in range(94):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 try:
