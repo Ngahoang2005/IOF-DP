@@ -926,14 +926,19 @@ class LwF(BaseLearner):
 
     def _train(self, train_loader, test_loader):
         resume = self.args['resume']  # set resume=True to use saved checkpoints
+        checkpoint_classes = self._total_classes if self._cur_task == 0 else self._known_classes
+        checkpoint_path = os.path.join(self.args["model_dir"], f"{checkpoint_classes}_model.pth.tar")
+        resume_active = resume and os.path.exists(checkpoint_path)
+
+        if resume_active:
+            print(f"Loading checkpoint: {checkpoint_path}")
+            self._network.load_state_dict(torch.load(checkpoint_path)["state_dict"], strict=False)
         if self._cur_task == 0:
-            if resume:
-                print("Loading checkpoint: {}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))
-                self._network.load_state_dict(torch.load("{}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))["state_dict"], strict=False)
+
             self._network.to(self._device)
             if hasattr(self._network, "module"):
                 self._network_module_ptr = self._network.module
-            if not resume:
+            if not resume_active:
                 optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=init_lr, weight_decay=init_weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay)
                 self._init_train(train_loader, test_loader, optimizer, scheduler)
@@ -962,16 +967,12 @@ class LwF(BaseLearner):
                     F.normalize(torch.t(Delta.float()), p=2, dim=-1))
             self._build_protos()
         else:
-            resume = self.args['resume']
-            if resume:
-                print("Loading checkpoint: {}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))
-                self._network.load_state_dict(torch.load("{}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))["state_dict"], strict=False)
             self._network.to(self._device)
             if hasattr(self._network, "module"):
                 self._network_module_ptr = self._network.module
             if self._old_network is not None:
                 self._old_network.to(self._device)
-            if not resume:
+            if not resume_active:
                 optimizer = optim.SGD(self._network.parameters(), lr=lrate, momentum=0.9, weight_decay=weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=milestones, gamma=lrate_decay)
                 self._update_representation(train_loader, test_loader, optimizer, scheduler)
