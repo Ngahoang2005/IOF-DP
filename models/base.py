@@ -133,7 +133,8 @@ class BaseLearner(object):
 
 
         return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
-  
+        
+    
     def _extract_vectors_adv(self, loader, old=False):
         self._network.eval()
         if old:
