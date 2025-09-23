@@ -34,7 +34,7 @@ init_weight_decay = 0.0005
 # lamda = 10
 
 # Tiny-ImageNet200
-epochs = 80
+epochs = 100
 lrate = 0.001
 milestones = [30, 60]
 lrate_decay = 0.1
@@ -336,8 +336,8 @@ class LwF(BaseLearner):
             assert inner.shape == outer.shape, f"Mismatched shape for {n}: {inner.shape} vs {outer.shape}"
 
             both_one = (inner == 1) & (outer == 1)
-            inner[both_one] = 0.2
-            outer[both_one] = 0.8
+            inner[both_one] = 0.1
+            outer[both_one] = 0.9
             both_zero = (inner == 0) & (outer == 0)
             inner[both_zero] = 0.5
             outer[both_zero] = 0.5
