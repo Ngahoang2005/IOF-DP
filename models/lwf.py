@@ -600,20 +600,54 @@ class LwF(BaseLearner):
             self._network = self._network.module
 
     def _train(self, train_loader, test_loader):
-        resume = self.args['resume']  # set resume=True to use saved checkpoints
-        checkpoint_classes = self._total_classes if self._cur_task == 0 else self._known_classes
-        checkpoint_path = os.path.join(self.args["model_dir"], f"{checkpoint_classes}_model.pth.tar")
-        resume_active = resume and os.path.exists(checkpoint_path)
+        resume = bool(self.args.get('resume', False))
+        model_dir = self.args["model_dir"]
 
-        if resume_active:
-            print(f"Loading checkpoint: {checkpoint_path}")
-            self._network.load_state_dict(torch.load(checkpoint_path)["state_dict"], strict=False)
+        ckpt_prev = os.path.join(model_dir, f"{getattr(self, '_known_classes', 0)}_model.pth.tar")
+        ckpt_curr = os.path.join(model_dir, f"{self._total_classes}_model.pth.tar")
+
+        has_prev = os.path.exists(ckpt_prev)
+        has_curr = os.path.exists(ckpt_curr)
+
+        # Mặc định: cần train. Chỉ khi có ckpt hiện tại + resume=True thì mới không train.
+        need_train = True
+        ckpt_to_load = None
+
         if self._cur_task == 0:
+            # task 0: ưu tiên ckpt_curr (thường là 20_model.pth.tar nếu đã pretrain xong init task)
+            if resume and has_curr:
+                ckpt_to_load = ckpt_curr
+                need_train = False
+            elif resume and has_prev:        # hiếm, nhưng vẫn hỗ trợ
+                ckpt_to_load = ckpt_prev
+                need_train = True
+        else:
+            # task > 0: nếu đã có ckpt_curr (đã train xong task này) thì không train lại
+            if resume and has_curr:
+                ckpt_to_load = ckpt_curr
+                need_train = False
+            elif resume and has_prev:
+                # chỉ có ckpt task trước -> load để khởi động, NHƯNG vẫn train task hiện tại
+                ckpt_to_load = ckpt_prev
+                need_train = True
 
-            self._network.to(self._device)
-            if hasattr(self._network, "module"):
-                self._network_module_ptr = self._network.module
-            if not resume_active:
+        if ckpt_to_load is not None:
+            print(f"[RESUME] Loading checkpoint: {ckpt_to_load}")
+            state = torch.load(ckpt_to_load, map_location='cpu')
+            self._network.load_state_dict(state["state_dict"], strict=False)
+        else:
+            if resume:
+                print(f"[RESUME] No checkpoint found (tried: {ckpt_curr}, {ckpt_prev}). Training from scratch.")
+
+        # ===== Device placement =====
+        self._network.to(self._device)
+        if hasattr(self._network, "module"):
+            self._network_module_ptr = self._network.module
+        if self._old_network is not None:
+            self._old_network.to(self._device)
+
+        if self._cur_task == 0:
+            if need_train:
                 optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=init_lr, weight_decay=init_weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay)
                 self._init_train(train_loader, test_loader, optimizer, scheduler)
@@ -642,12 +676,8 @@ class LwF(BaseLearner):
                     F.normalize(torch.t(Delta.float()), p=2, dim=-1))
             self._build_protos()
         else:
-            self._network.to(self._device)
-            if hasattr(self._network, "module"):
-                self._network_module_ptr = self._network.module
-            if self._old_network is not None:
-                self._old_network.to(self._device)
-            if not resume_active:
+            
+            if need_train:
                 optimizer = optim.SGD(self._network.parameters(), lr=lrate, momentum=0.9, weight_decay=weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=milestones, gamma=lrate_decay)
                 self._update_representation(train_loader, test_loader, optimizer, scheduler)
