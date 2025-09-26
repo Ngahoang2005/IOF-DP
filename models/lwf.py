@@ -159,7 +159,7 @@ class IPTScore:
         for n, score in ipt_score_dic_inner.items():
             #print(n, score)
             # 根据分位数计算 01 mask，将分位数大于 0.5 的元素设为 1，其余设为 0
-            threshold = torch.quantile(score, 0.8)
+            threshold = torch.quantile(score, 0.6)
             inner_mask[n] = (score > threshold).float()
             #print("after 01mask")
             #print(n, score)
@@ -339,8 +339,8 @@ class LwF(BaseLearner):
             inner[both_one] = 0.3
             outer[both_one] = 0.7
             both_zero = (inner == 0) & (outer == 0)
-            inner[both_zero] = 0.5
-            outer[both_zero] = 0.5
+            inner[both_zero] = 0.4
+            outer[both_zero] = 0.6
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
