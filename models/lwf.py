@@ -34,7 +34,7 @@ init_weight_decay = 0.0005
 # lamda = 10
 
 # Tiny-ImageNet200
-epochs = 100
+epochs = 125
 lrate = 0.001
 milestones = [30, 60]
 lrate_decay = 0.1
@@ -208,7 +208,7 @@ class IPTScore:
             ipt_score_dic_outer[n] = ipt_score
 
         all_scores = torch.cat([score.flatten() for score in ipt_score_dic_outer.values()])
-        threshold = torch.quantile(all_scores, 0.6)
+        threshold = torch.quantile(all_scores, self.quantile)
 
         outer_mask = {}
         for n, score in ipt_score_dic_outer.items():
@@ -339,8 +339,8 @@ class LwF(BaseLearner):
             inner[both_one] = 0.3
             outer[both_one] = 0.7
             both_zero = (inner == 0) & (outer == 0)
-            inner[both_zero] = 0.4
-            outer[both_zero] = 0.6
+            inner[both_zero] = 0.5
+            outer[both_zero] = 0.5
         keys_inner_mask = set(inner_mask.keys())
         keys_delta_in = set(delta_in.keys())
         keys_delta_out = set(delta_out.keys())
