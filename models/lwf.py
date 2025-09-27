@@ -526,7 +526,7 @@ class LwF(BaseLearner):
                 ckpt_files = [f for f in os.listdir(self.args["model_dir"]) if f.endswith("_model.pth.tar")]
                 if ckpt_files:
                     ckpt_classes = max([int(f.split("_")[0]) for f in ckpt_files])
-                    ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
+                    ckpt_path = os.path.join(self.args["model_dir"], f"{20}_model.pth.tar")
                     print(f"Resuming from checkpoint: {ckpt_path}")
                     state = torch.load(ckpt_path, map_location=self._device)
 
@@ -576,7 +576,8 @@ class LwF(BaseLearner):
                 ckpt_files = [f for f in os.listdir(self.args["model_dir"]) if f.endswith("_model.pth.tar")]
                 if ckpt_files:
                     ckpt_classes = max([int(f.split("_")[0]) for f in ckpt_files])
-                    ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
+                    ckpt_class = 20 * (self._cur_task + 1)
+                    ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_class}_model.pth.tar")
                     print(f"Resuming from checkpoint: {ckpt_path}")
                     state = torch.load(ckpt_path, map_location=self._device)
 
