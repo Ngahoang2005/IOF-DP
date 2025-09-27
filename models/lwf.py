@@ -600,19 +600,29 @@ class LwF(BaseLearner):
             self._network = self._network.module
 
     def _train(self, train_loader, test_loader):
-        resume = self.args['resume']  # set resume=True to use saved checkpoints
-        if self._cur_task == 0:
-            if resume:
-                ckpt_classes = self._total_classes
+        resume = self.args['resume'] 
+         # set resume=True to use saved checkpoints
+        ckpt_classes, ckpt_path = None, None
+        if resume:
+            ckpt_files = [f for f in os.listdir(self.args["model_dir"]) if f.endswith("_model.pth.tar")]
+            if ckpt_files:
+                ckpt_classes = max([int(f.split("_")[0]) for f in ckpt_files])
                 ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
-                print(f"Loading checkpoint: {ckpt_path}")
-                self._network.load_state_dict(torch.load(ckpt_path)["state_dict"], strict=False)
-        
-            self._network.to(self._device)
-            if hasattr(self._network, "module"):
-                self._network_module_ptr = self._network.module
+                print(f"Resuming from checkpoint: {ckpt_path}")
+                state = torch.load(ckpt_path, map_location=self._device)
+                self._network.load_state_dict(state["state_dict"], strict=False)
+            else:
+                print("No checkpoint found, training from scratch!")
+
+        self._network.to(self._device)
+        if hasattr(self._network, "module"):
+            self._network_module_ptr = self._network.module
+        if self._old_network is not None:
+            self._old_network.to(self._device)
+
+        if self._cur_task == 0:
           
-            if not resume:
+            if not resume or ckpt_classes is None:
                 optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=init_lr, weight_decay=init_weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay)
                 self._init_train(train_loader, test_loader, optimizer, scheduler)
@@ -641,18 +651,7 @@ class LwF(BaseLearner):
                     F.normalize(torch.t(Delta.float()), p=2, dim=-1))
             self._build_protos()
         else:
-            resume = self.args['resume']
-            if resume:
-                ckpt_classes = self._known_classes
-                ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
-                print(f"Loading checkpoint: {ckpt_path}")
-                self._network.load_state_dict(torch.load(ckpt_path)["state_dict"], strict=False)
-            self._network.to(self._device)
-            if hasattr(self._network, "module"):
-                self._network_module_ptr = self._network.module
-            if self._old_network is not None:
-                self._old_network.to(self._device)
-            if not resume:
+            if not resume or ckpt_classes is None or self._total_classes > ckpt_classes:
                 optimizer = optim.SGD(self._network.parameters(), lr=lrate, momentum=0.9, weight_decay=weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=milestones, gamma=lrate_decay)
                 self._update_representation(train_loader, test_loader, optimizer, scheduler)
