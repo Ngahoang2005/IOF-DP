@@ -34,7 +34,7 @@ init_weight_decay = 0.0005
 # lamda = 10
 
 # Tiny-ImageNet200
-epochs = 100
+epochs = 125 
 lrate = 0.001
 milestones = [45, 90]
 lrate_decay = 0.1
