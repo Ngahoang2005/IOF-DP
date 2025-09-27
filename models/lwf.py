@@ -443,11 +443,10 @@ class LwF(BaseLearner):
     def after_task(self):
         self._old_network = self._network.copy().freeze()
         self._known_classes = self._total_classes
-        if not self.args['resume']:
-            if not os.path.exists(self.args["model_dir"]):
-                os.makedirs(self.args["model_dir"])
-            self.save_checkpoint("{}".format(self.args["model_dir"]))
-        
+        os.makedirs(self.args["model_dir"], exist_ok=True)
+        save_path = os.path.join(self.args["model_dir"], f"{self._total_classes}_model.pth.tar")
+        torch.save({"state_dict": self._network.state_dict()}, save_path)
+        print(f"Saved checkpoint to {save_path}")
 
     def incremental_train(self, data_manager):
         self.data_manager = data_manager
