@@ -603,11 +603,15 @@ class LwF(BaseLearner):
         resume = self.args['resume']  # set resume=True to use saved checkpoints
         if self._cur_task == 0:
             if resume:
-                print("Loading checkpoint: {}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))
-                self._network.load_state_dict(torch.load("{}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))["state_dict"], strict=False)
+                ckpt_classes = self._total_classes
+                ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
+                print(f"Loading checkpoint: {ckpt_path}")
+                self._network.load_state_dict(torch.load(ckpt_path)["state_dict"], strict=False)
+        
             self._network.to(self._device)
             if hasattr(self._network, "module"):
                 self._network_module_ptr = self._network.module
+          
             if not resume:
                 optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=init_lr, weight_decay=init_weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay)
@@ -639,8 +643,10 @@ class LwF(BaseLearner):
         else:
             resume = self.args['resume']
             if resume:
-                print("Loading checkpoint: {}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))
-                self._network.load_state_dict(torch.load("{}{}_model.pth.tar".format(self.args["model_dir"], self._total_classes))["state_dict"], strict=False)
+                ckpt_classes = self._known_classes - self._increment
+                ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
+                print(f"Loading checkpoint: {ckpt_path}")
+                self._network.load_state_dict(torch.load(ckpt_path)["state_dict"], strict=False)
             self._network.to(self._device)
             if hasattr(self._network, "module"):
                 self._network_module_ptr = self._network.module
