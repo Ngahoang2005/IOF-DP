@@ -622,7 +622,7 @@ class LwF(BaseLearner):
 
         if self._cur_task == 0:
           
-            if not resume or ckpt_classes is None:
+            if not resume or ckpt_classes <= 20 * self._cur_task:
                 optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=init_lr, weight_decay=init_weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay)
                 self._init_train(train_loader, test_loader, optimizer, scheduler)
@@ -651,7 +651,7 @@ class LwF(BaseLearner):
                     F.normalize(torch.t(Delta.float()), p=2, dim=-1))
             self._build_protos()
         else:
-            if not resume or ckpt_classes is None:
+            if not resume or ckpt_classes <= 20 * self._cur_task:
                 optimizer = optim.SGD(self._network.parameters(), lr=lrate, momentum=0.9, weight_decay=weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=milestones, gamma=lrate_decay)
                 self._update_representation(train_loader, test_loader, optimizer, scheduler)
