@@ -574,25 +574,26 @@ class LwF(BaseLearner):
             self._build_protos()
         else:
             ckpt_classes, ckpt_path = None, None
+            target_ckpt_classes = 20 * (self._cur_task + 1)
+            target_ckpt_path = os.path.join(self.args["model_dir"], f"{target_ckpt_classes}_model.pth.tar")
             if resume:
                 ckpt_files = [f for f in os.listdir(self.args["model_dir"]) if f.endswith("_model.pth.tar")]
                 if ckpt_files:
                     latest_ckpt_classes = max([int(f.split("_")[0]) for f in ckpt_files])
                     latest_ckpt_path = os.path.join(self.args["model_dir"], f"{latest_ckpt_classes}_model.pth.tar")
-                    target_ckpt_classes = 20 * (self._cur_task + 1)
-                    target_ckpt_path = os.path.join(self.args["model_dir"], f"{target_ckpt_classes}_model.pth.tar")
+
                     if os.path.exists(target_ckpt_path):
+                       
                         ckpt_classes, ckpt_path = target_ckpt_classes, target_ckpt_path
                     else:
+                       
                         ckpt_classes, ckpt_path = latest_ckpt_classes, latest_ckpt_path
-                    
+
                     print(f"Resuming from checkpoint: {ckpt_path}")
                     state = torch.load(ckpt_path, map_location=self._device)
-
-                    # Chỉ load những layer có cùng shape (tránh size mismatch ở classifier)
                     state_dict = state["state_dict"]
                     model_dict = self._network.state_dict()
-                    pretrained_dict = {k: v for k, v in state_dict.items() 
+                    pretrained_dict = {k: v for k, v in state_dict.items()
                                     if k in model_dict and v.size() == model_dict[k].size()}
                     model_dict.update(pretrained_dict)
                     self._network.load_state_dict(model_dict)
