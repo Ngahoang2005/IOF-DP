@@ -610,7 +610,14 @@ class LwF(BaseLearner):
                 ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
                 print(f"Resuming from checkpoint: {ckpt_path}")
                 state = torch.load(ckpt_path, map_location=self._device)
-                self._network.load_state_dict(state["state_dict"], strict=False)
+
+                # Chỉ load những layer có cùng shape (tránh size mismatch ở classifier)
+                state_dict = state["state_dict"]
+                model_dict = self._network.state_dict()
+                pretrained_dict = {k: v for k, v in state_dict.items() 
+                                if k in model_dict and v.size() == model_dict[k].size()}
+                model_dict.update(pretrained_dict)
+                self._network.load_state_dict(model_dict)
             else:
                 print("No checkpoint found, training from scratch!")
 
@@ -622,7 +629,7 @@ class LwF(BaseLearner):
 
         if self._cur_task == 0:
           
-            if not resume or ckpt_classes <= 20 * self._cur_task:
+            if not resume or ckpt_classes is None or ckpt_classes < 20 * (self._cur_task + 1):
                 optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=init_lr, weight_decay=init_weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay)
                 self._init_train(train_loader, test_loader, optimizer, scheduler)
@@ -651,7 +658,7 @@ class LwF(BaseLearner):
                     F.normalize(torch.t(Delta.float()), p=2, dim=-1))
             self._build_protos()
         else:
-            if not resume or ckpt_classes <= 20 * self._cur_task:
+            if not resume or ckpt_classes is None or ckpt_classes < 20 * (self._cur_task + 1):
                 optimizer = optim.SGD(self._network.parameters(), lr=lrate, momentum=0.9, weight_decay=weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=milestones, gamma=lrate_decay)
                 self._update_representation(train_loader, test_loader, optimizer, scheduler)
