@@ -16,7 +16,7 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 2
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
@@ -34,7 +34,7 @@ init_weight_decay = 0.0005
 # lamda = 10
 
 # Tiny-ImageNet200
-epochs = 2
+epochs = 100
 lrate = 0.001
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -539,6 +539,7 @@ class LwF(BaseLearner):
                     self._network.load_state_dict(model_dict)
                 else:
                     print("No checkpoint found, training from scratch!")
+                    resume = False
             self._network.to(self._device)
             if hasattr(self._network, "module"):
                 self._network_module_ptr = self._network.module
@@ -590,6 +591,7 @@ class LwF(BaseLearner):
                     self._network.load_state_dict(model_dict)
                 else:
                     print("No checkpoint found, training from scratch!")
+                    resume = False
             self._network.to(self._device)
             if hasattr(self._network, "module"):
                 self._network_module_ptr = self._network.module
