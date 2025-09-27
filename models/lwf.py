@@ -515,36 +515,80 @@ class LwF(BaseLearner):
         self._train(self.train_loader, self.test_loader)
         if len(self._multiple_gpus) > 1:
             self._network = self._network.module
+    
+    def _find_resume_ckpt(self, target_classes:int):
+        """
+        Tìm checkpoint để resume cho mốc target_classes (20 * (cur_task+1)).
+        Ưu tiên: đúng == target, nếu không có thì lấy lớn nhất <= target.
+        Trả về (ckpt_classes, ckpt_path) hoặc (None, None) nếu không có.
+        """
+        if not os.path.exists(self.args["model_dir"]):
+            return None, None
+        ckpt_files = [f for f in os.listdir(self.args["model_dir"]) if f.endswith("_model.pth.tar")]
+        if not ckpt_files:
+            return None, None
 
+        # các file có dạng "<num_classes>_model.pth.tar"
+        available = []
+        for f in ckpt_files:
+            try:
+                num = int(f.split("_")[0])
+                available.append((num, os.path.join(self.args["model_dir"], f)))
+            except Exception:
+                pass
+        if not available:
+            return None, None
+
+        # ưu tiên exact match
+        for num, path in available:
+            if num == target_classes:
+                return num, path
+
+        # nếu không có exact, lấy lớn nhất <= target
+        leq = [(num, path) for num, path in available if num <= target_classes]
+        if leq:
+            num, path = max(leq, key=lambda x: x[0])
+            return num, path
+
+        # nếu toàn bộ > target thì thôi, không resume
+        return None, None
+
+
+    def _safe_load_state(self, ckpt_path):
+        """Load state_dict an toàn: chỉ nạp các tensor trùng tên & trùng shape."""
+        print(f"Resuming from checkpoint: {ckpt_path}")
+        state = torch.load(ckpt_path, map_location=self._device)
+        state_dict = state["state_dict"] if "state_dict" in state else state
+        model_dict = self._network.state_dict()
+        filtered = {k: v for k, v in state_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
+        model_dict.update(filtered)
+        self._network.load_state_dict(model_dict, strict=False)
     def _train(self, train_loader, test_loader):
         resume = self.args['resume'] 
          # set resume=True to use saved checkpoints
+        target_classes = 20 * (self._cur_task + 1)
+
+        self._network.to(self._device)
+        if hasattr(self._network, "module"):
+            self._network_module_ptr = self._network.module
+        if self._old_network is not None:
+            self._old_network.to(self._device)
+
+        ckpt_classes = None
+        if resume:
+            ckpt_classes, ckpt_path = self._find_resume_ckpt(target_classes)
+            if ckpt_path is not None:
+                self._safe_load_state(ckpt_path)
+            else:
+                print("No suitable checkpoint found, training from scratch.")
+                resume = False
+
+        # --- TRAIN ---
+        need_train = (not resume) or (ckpt_classes is None) or (ckpt_classes < target_classes)
 
         if self._cur_task == 0:
-            ckpt_classes, ckpt_path = None, None
-            if resume:
-                ckpt_files = [f for f in os.listdir(self.args["model_dir"]) if f.endswith("_model.pth.tar")]
-                if ckpt_files:
-                    ckpt_classes = max([int(f.split("_")[0]) for f in ckpt_files])
-                    ckpt_path = os.path.join(self.args["model_dir"], f"{20}_model.pth.tar")
-                    print(f"Resuming from checkpoint: {ckpt_path}")
-                    
-                    state = torch.load(ckpt_path, map_location=self._device)
-
-                    # Chỉ load những layer có cùng shape (tránh size mismatch ở classifier)
-                    state_dict = state["state_dict"]
-                    model_dict = self._network.state_dict()
-                    pretrained_dict = {k: v for k, v in state_dict.items() 
-                                    if k in model_dict and v.size() == model_dict[k].size()}
-                    model_dict.update(pretrained_dict)
-                    self._network.load_state_dict(model_dict)
-                else:
-                    print("No checkpoint found, training from scratch!")
-                    resume = False
-            self._network.to(self._device)
-            if hasattr(self._network, "module"):
-                self._network_module_ptr = self._network.module
-            if (not resume) or (ckpt_classes is None) or (ckpt_classes < 20 * (self._cur_task + 1)):
+            
+            if need_train:
                 optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=init_lr, weight_decay=init_weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay)
                 self._init_train(train_loader, test_loader, optimizer, scheduler)
@@ -573,39 +617,8 @@ class LwF(BaseLearner):
                     F.normalize(torch.t(Delta.float()), p=2, dim=-1))
             self._build_protos()
         else:
-            ckpt_classes, ckpt_path = None, None
-            target_ckpt_classes = 20 * (self._cur_task + 1)
-            target_ckpt_path = os.path.join(self.args["model_dir"], f"{target_ckpt_classes}_model.pth.tar")
-            if resume:
-                ckpt_files = [f for f in os.listdir(self.args["model_dir"]) if f.endswith("_model.pth.tar")]
-                if ckpt_files:
-                    latest_ckpt_classes = max([int(f.split("_")[0]) for f in ckpt_files])
-                    latest_ckpt_path = os.path.join(self.args["model_dir"], f"{latest_ckpt_classes}_model.pth.tar")
-
-                    if os.path.exists(target_ckpt_path):
-                       
-                        ckpt_classes, ckpt_path = target_ckpt_classes, target_ckpt_path
-                    else:
-                       
-                        ckpt_classes, ckpt_path = latest_ckpt_classes, latest_ckpt_path
-
-                    print(f"Resuming from checkpoint: {ckpt_path}")
-                    state = torch.load(ckpt_path, map_location=self._device)
-                    state_dict = state["state_dict"]
-                    model_dict = self._network.state_dict()
-                    pretrained_dict = {k: v for k, v in state_dict.items()
-                                    if k in model_dict and v.size() == model_dict[k].size()}
-                    model_dict.update(pretrained_dict)
-                    self._network.load_state_dict(model_dict)
-                else:
-                    print("No checkpoint found, training from scratch!")
-                    resume = False
-            self._network.to(self._device)
-            if hasattr(self._network, "module"):
-                self._network_module_ptr = self._network.module
-            if self._old_network is not None:
-                self._old_network.to(self._device)
-            if (not resume) or (ckpt_classes is None) or (ckpt_classes < 20 * (self._cur_task + 1)):
+           
+            if need_train:
                 optimizer = optim.SGD(self._network.parameters(), lr=lrate, momentum=0.9, weight_decay=weight_decay)
                 scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=milestones, gamma=lrate_decay)
                 self._update_representation(train_loader, test_loader, optimizer, scheduler)
