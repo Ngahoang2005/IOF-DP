@@ -643,7 +643,7 @@ class LwF(BaseLearner):
         else:
             resume = self.args['resume']
             if resume:
-                ckpt_classes = self._known_classes - 20
+                ckpt_classes = self._known_classes
                 ckpt_path = os.path.join(self.args["model_dir"], f"{ckpt_classes}_model.pth.tar")
                 print(f"Loading checkpoint: {ckpt_path}")
                 self._network.load_state_dict(torch.load(ckpt_path)["state_dict"], strict=False)
