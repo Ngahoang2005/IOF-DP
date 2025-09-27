@@ -12,7 +12,7 @@
   "batch_size": 64,
   "device": ["0"],
   "seed": [1993],
-  "resume": false,
+  "resume": true,
   "model_dir": "save_model/tiny-imagenet/resnet18/dpcr_tiny_10_seed_1993/",
   "DPCR": true,
   "rg": 2000,
