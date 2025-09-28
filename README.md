@@ -15,7 +15,7 @@ Exemplar-free class-incremental learning (EFCIL) trains models on a sequence of 
 ## Overview
 
 <div align="center">
-<img src="imgs/IOF" width="800px">
+<img src="imgs/IOF.png" width="800px">
 </div>
 
 ## Quick Start
