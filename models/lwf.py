@@ -16,14 +16,14 @@ from torchvision import datasets, transforms
 from utils.autoaugment import CIFAR10Policy
 
 
-init_epoch = 2
+init_epoch = 200
 init_lr = 0.1
 init_milestones = [60, 120, 160]
 init_lr_decay = 0.1
 init_weight_decay = 0.0005
 
 # cifar100
-epochs = 2 
+epochs = 100
 lrate = 0.05
 milestones = [45, 90]
 lrate_decay = 0.1
@@ -449,7 +449,7 @@ class LwF(BaseLearner):
 
             data_iter = iter(train_loader)
             #for _, cycle in enumerate(prog_bar):
-            for cycle in range(32):  # 32 chu kỳ
+            for cycle in range(39):  # 32 chu kỳ
                 # === 4 bước INNER ===
                 try:
                     _, inputs, targets = next(data_iter)
@@ -458,8 +458,7 @@ class LwF(BaseLearner):
                     _, inputs, targets = next(data_iter)
 
                 inputs, targets = inputs.to(self._device), targets.to(self._device)
-                
-                theta_t = {n: p.clone().detach() for n, p in self._network.named_parameters() if "fc" not in n}
+            
                 for _ in range(1):
                     student_outputs = self._network(inputs)["logits"]
                     fake_targets = targets - self._known_classes
