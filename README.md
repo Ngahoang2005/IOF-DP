@@ -1,20 +1,21 @@
 <div align="center">
   
-# 【ICML' 2025】Semantic Shift Estimation via Dual-Projection and Classifier Reconstruction for Exemplar-Free Class-Incremental Learning
-###  Run He, Di Fang, Yicheng Xu, Yawen Cui, Ming Li, Cen Chen, Ziqian Zeng, Huiping Zhuang* 
+# 【IOF-DP: Iterative Inner–Outer Fusion with Dual-Projection for Exemplar-Free Class-Incremental Learning
+### Thanh-Nga Hoang Thi, Thanh-Thu Nguyen Mai,Quynh-Trang Pham Thi  * 
   
 </div>
 
 ## Introduction
-The official implementation for [Semantic Shift Estimation via Dual-Projection and Classifier Reconstruction for Exemplar-Free Class-Incremental Learning](https://arxiv.org/abs/2503.05423) in PyTorch.
+The official implementation for [IOF-DP: Iterative Inner–Outer Fusion with
+Dual-Projection for Exemplar-Free
+Class-Incremental Learning]
 
 ## Abstract
-Exemplar-Free Class-Incremental Learning (EFCIL) aims to sequentially learn from distinct categories without retaining exemplars but easily suffers from catastrophic forgetting of learned knowledge. While existing EFCIL methods leverage knowledge distillation to alleviate forgetting, they still face two critical challenges: semantic shift and decision bias. Specifically, the embeddings of old tasks shift in the embedding space after learning new tasks, and the classifier becomes biased towards new tasks due to training solely with new data, hindering the balance between old and new knowledge. To address these issues, we propose the Dual-Projection Shift Estimation and Classifier Reconstruction (DPCR) approach for EFCIL. DPCR effectively estimates semantic shift through a dual-projection, which combines a learnable transformation with a row-space projection to capture both task-wise and category-wise shifts. Furthermore, to mitigate decision bias, DPCR employs ridge regression to reformulate a classifier reconstruction process. This reconstruction exploits previous in covariance and prototype of each class after calibration with estimated shift, thereby reducing decision bias. Extensive experiments demonstrate that, on various datasets, DPCR effectively balances old and new tasks, outperforming state-of-the-art EFCIL methods.
-
+Exemplar-free class-incremental learning (EFCIL) trains models on a sequence of tasks without storing past samples, which is crucial under privacy or memory constraints. However, EFCIL remains challenging due to (i) catastrophic forgetting of old knowledge, (ii) semantic drift of features when the backbone adapts to new tasks, and (iii) decision bias favoring recently learned classes. We propose IOF-DP, an iterative inner–outer task-vector framework with importance-score-based fusion and a DPCR-based calibration stage. At each mini-batch, an inner step adapts to new classes while an outer step distills to the previous model, yielding two displacement vectors; importance scores provide parameter-wise soft masks to fuse them and balance plasticity vs. stability. After fusion, we adopt Dual-Projection to align old statistics and ridge-based reconstruction to rebalance the classifier. Experiments on standard EFCIL benchmarks show that IOF-DP achieves a superior stability–plasticity trade-off and improves overall accuracy over strong baselines. 
 ## Overview
 
 <div align="center">
-<img src="imgs/dpcr.png" width="800px">
+<img src="imgs/IOF" width="800px">
 </div>
 
 ## Quick Start
@@ -31,9 +32,7 @@ A suitable [conda](https://conda.io/) environment named `dpcr` can be created an
 
 ### Datasets
 
-We provide the implementation on five benchmark datasets reported in the paper, i.e., CIFAR-100, and Tiny-ImageNet, ImageNet-100, CUB-200, and ImageNet-1k. 
-
-You should define your directory to the dataset in [utils/data.py](utils/data.py).
+We provide the implementation on five benchmark datasets reported in the paper, i.e., CIFAR-100, and Tiny-ImageNet 200
 
 ### Run
 
@@ -57,23 +56,8 @@ Part of arguments are listed followed.
 
 ## Analytic Continual Learning
 
-Our work belongs to the branch of analytic continual learning, you can find other works at "[Analytic Continual Learning.](https://github.com/ZHUANGHP/Analytic-continual-learning)"
-
-## Dual Branch
-
-We have a dual branch of analytic federated learning which leverages the least-squares to achieve invariance in federated learning. If you are interested, the codes are available at "[Analytic Federated Learning.](https://github.com/ZHUANGHP/Analytic-federated-learning)" 
-
 ## Acknowledgment
 
 The implementation of the codes is partly referred to [PyCIL](https://github.com/LAMDA-CL/PyCIL) and [ADC](https://github.com/dipamgoswami/ADC). We sincerely appreciate for their contributions.
 
-## Cite Our Paper
-If you find this paper useful, please consider staring this repo and citing our paper:
-```bib
-@misc{He_ICML2025_DPCR,
-  title = 	 {Semantic Shift Estimation via Dual-Projection and Classifier Reconstruction for Exemplar-Free Class-Incremental Learning},
-  author =       {Run He and Di Fang and Yicheng Xu and Yawen Cui and Ming Li and Cen Chen and Ziqian Zeng and Huiping Zhuang},
-  booktitle = 	 {Proceedings of the 42nd International Conference on Machine Learning},
-  year = 	 {2025},
-}
-```
+
