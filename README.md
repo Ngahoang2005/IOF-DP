@@ -1,7 +1,7 @@
 <div align="center">
   
 # 【IOF-DP: Iterative Inner–Outer Fusion with Dual-Projection for Exemplar-Free Class-Incremental Learning
-### Thanh-Nga Hoang Thi, Thanh-Thu Nguyen Mai,Quynh-Trang Pham Thi  * 
+### Thanh-Nga Hoang Thi, Thanh-Thu Nguyen Mai, Quynh-Trang Pham Thi  * 
   
 </div>
 
