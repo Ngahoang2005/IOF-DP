@@ -466,7 +466,6 @@ class LwF(BaseLearner):
 
                     optimizer.zero_grad()
                     loss_inner.backward()
-                    self.ipt_score.update_inner_score(self._network, epoch)
                     optimizer.step()
     
                     losses_inner += loss_inner.item()
@@ -488,7 +487,6 @@ class LwF(BaseLearner):
                     loss = 20*loss_kd + loss_clf
                     optimizer.zero_grad()
                     loss.backward()
-                    self.ipt_score.update_outer_score(self._network, epoch)
                     optimizer.step()
 
                     losses_outer += loss.item()
