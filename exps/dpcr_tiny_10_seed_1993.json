@@ -3,7 +3,7 @@
   "dataset": "tinyimagenet200",
   "memory_size": 0,
   "fixed_memory": false,
-  "shuffle": true,
+  "shuffle": false,
   "cosine": true,
   "init_cls": 20,
   "increment": 20,
@@ -13,7 +13,7 @@
   "device": ["0"],
   "seed": [1993],
   "resume": true,
-  "model_dir": "save_model/tiny-imagenet/resnet18/dpcr_tiny_10_seed_1993/",
+  "model_dir": "save_model/tiny-imagenet/resnet18/dpcr_tiny_10_seed_non/",
   "DPCR": true,
   "rg": 2000,
   "rg_tssp": 1e-9
