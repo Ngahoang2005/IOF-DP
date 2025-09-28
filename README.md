@@ -54,10 +54,3 @@ Part of arguments are listed followed.
 - `rg_tssp`: The regularization term in the TSSP, 1e-9 by default.
 
 
-## Analytic Continual Learning
-
-## Acknowledgment
-
-The implementation of the codes is partly referred to [PyCIL](https://github.com/LAMDA-CL/PyCIL) and [ADC](https://github.com/dipamgoswami/ADC). We sincerely appreciate for their contributions.
-
-
